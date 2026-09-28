@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>샘플 출고</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --bg:#F1F4F1; --card:#FFFFFF; --ink:#17211B; --sub:#5C6A61; --line:#D8E0DA;
+    --green:#2D6A4F; --green-d:#1E4D38; --amber:#F2B233; --red:#B9400E;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    -webkit-text-size-adjust:100%}
+  button,input,textarea{font-family:inherit}
+  button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--amber);outline-offset:1px}
+
+  header{position:sticky;top:0;z-index:5;background:var(--green);color:#fff;
+    padding:calc(14px + env(safe-area-inset-top)) 16px 12px}
+  header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  header p{margin:3px 0 12px;font-size:13px;opacity:.82}
+  .search{width:100%;border:0;border-radius:10px;padding:12px;font-size:16px;color:var(--ink)}
+
+  main{padding:10px 12px 120px;max-width:640px;margin:0 auto}
+  .msg{text-align:center;color:var(--sub);font-size:14px;padding:40px 10px;line-height:1.6}
+
+  .item{display:flex;align-items:center;gap:10px;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}
+  .item.on{border-color:var(--green);box-shadow:inset 4px 0 0 var(--green)}
+  .info{flex:1;min-width:0}
+  .name{font-size:15.5px;font-weight:600;line-height:1.35}
+  .meta{font-size:12.5px;color:var(--sub);margin-top:3px}
+  .meta .warn{color:var(--red);font-weight:600}
+
+  .step{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none}
+  .step button{width:40px;height:40px;border:0;background:#F5F8F5;font-size:21px;color:var(--green-d);cursor:pointer}
+  .step input{width:46px;height:40px;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);
+    text-align:center;font-size:16px;color:var(--ink);-moz-appearance:textfield}
+  .step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+  .bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#fff;border-top:1px solid var(--line);
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center}
+  .bar .sum{flex:1;font-size:13.5px;color:var(--sub)}
+  .bar .sum b{display:block;color:var(--ink);font-size:17px}
+  .btn{border:0;border-radius:12px;background:var(--green);color:#fff;font-size:16px;font-weight:600;
+    padding:14px 22px;cursor:pointer}
+  .btn:disabled{background:#AEB9B1;cursor:default}
+  .btn.full{width:100%;margin-top:6px}
+  .btn.ghost{background:transparent;color:var(--green-d);border:1px solid var(--line)}
+
+  .overlay{position:fixed;inset:0;background:rgba(23,33,27,.45);z-index:10;display:none}
+  .overlay.show{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:11;max-height:92vh;overflow-y:auto;
+    background:var(--bg);border-radius:18px 18px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));
+    transform:translateY(105%);transition:transform .22s ease;max-width:640px;margin:0 auto}
+  .sheet.show{transform:none}
+  .sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .sheet-head h2{margin:0;font-size:18px}
+  .x{border:0;background:none;font-size:15px;color:var(--sub);padding:8px;cursor:pointer}
+
+  .box{background:#fff;border:1px solid var(--line);border-radius:12px;padding:4px 12px;margin-bottom:14px}
+  .crow{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .crow:last-child{border-bottom:0}
+  .crow .n{flex:1;font-size:14.5px}
+  .crow .q{font-weight:700;font-size:15px}
+  .crow .rm{border:0;background:none;color:var(--red);font-size:13px;padding:6px;cursor:pointer}
+
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13.5px;font-weight:600;margin-bottom:6px}
+  .field label small{font-weight:400;color:var(--sub)}
+  .field input,.field textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;
+    font-size:16px;background:#fff;color:var(--ink)}
+  .field textarea{resize:vertical;min-height:60px}
+  .two{display:flex;gap:10px}.two .field{flex:1}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-size:14px;
+    color:var(--ink);cursor:pointer}
+  .chip.on{background:var(--green);border-color:var(--green);color:#fff}
+  .err{color:var(--red);font-size:13.5px;min-height:18px;margin:4px 0}
+
+  .done{text-align:center;padding:24px 8px 8px}
+  .done .big{font-size:40px;line-height:1;color:var(--green)}
+  .done h2{margin:12px 0 6px;font-size:19px}
+  .done p{margin:0 0 18px;color:var(--sub);font-size:14px;line-height:1.6}
+
+  @media (prefers-reduced-motion:reduce){.sheet{transition:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>샘플 출고</h1>
+  <p>필요한 샘플을 모두 담고 한 번에 등록하세요</p>
+  <input id="q" class="search" type="search" placeholder="제품명·샘플ID 검색" autocomplete="off">
+</header>
+
+<main id="list"><div class="msg">샘플 목록을 불러오는 중…</div></main>
+
+<div class="bar">
+  <div class="sum" id="sum"><b>담긴 샘플 없음</b>수량을 눌러 담아 주세요</div>
+  <button class="btn" id="openCart" disabled>담은 목록 보기</button>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<section class="sheet" id="sheet" aria-label="출고 등록">
+  <div id="formView">
+    <div class="sheet-head">
+      <h2>출고 등록</h2>
+      <button class="x" id="closeSheet">닫기</button>
+    </div>
+    <div class="box" id="cartBox"></div>
+
+    <div class="two">
+      <div class="field"><label for="user">담당자</label><input id="user" autocomplete="name"></div>
+      <div class="field"><label for="dept">부서 <small>선택</small></label><input id="dept"></div>
+    </div>
+    <div class="field">
+      <label>사용 구분</label>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="field">
+      <label for="client">제공처 <small>고객사·행사명 등</small></label>
+      <input id="client">
+    </div>
+    <div class="field">
+      <label for="memo">비고 <small>선택</small></label>
+      <textarea id="memo"></textarea>
+    </div>
+    <div class="err" id="err"></div>
+    <button class="btn full" id="submit">출고 등록</button>
+  </div>
+
+  <div id="doneView" hidden>
+    <div class="done">
+      <div class="big">✓</div>
+      <h2>출고가 등록됐어요</h2>
+      <p id="doneText"></p>
+      <button class="btn full" id="again">새로 담기</button>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Apps Script 배포 주소 (…/exec). 재배포 시 '새 버전'으로 올리면 이 주소는 그대로입니다.
+  var API = 'https://script.google.com/macros/s/AKfycbz7_-VStBTV5Y2pe3m1mpoTx-GHkZ4JFSa2FTHUMRZAZosYx5xmjT6YI4MjFAFj5qpb1A/exec';
+
+  function unwrap(res) { if (!res.ok) throw new Error(res.error); return res.data; }
+  function netErr(e) {
+    if (e instanceof TypeError) return new Error('서버에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.');
+    return e;
+  }
+  function apiInit() {
+    return fetch(API + '?action=init').then(function (r) { return r.json(); }).then(unwrap).catch(function (e) { throw netErr(e); });
+  }
+  function apiSubmit(p) {
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(p) })
+      .then(function (r) { return r.json(); }).then(unwrap).catch(function (e) { throw netErr(e); });
+  }
+
+  var ITEMS = [], PURPOSES = [], cart = {}, purpose = '';
+  var $ = function (s) { return document.querySelector(s); };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function byId(id) { for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].id === id) return ITEMS[i]; }
+
+  function load() {
+    apiInit()
+      .then(function (d) {
+        ITEMS = d.items; PURPOSES = d.purposes;
+        renderList(); renderChips();
+      })
+      .catch(function (e) {
+        $('#list').innerHTML = '<div class="msg">목록을 불러오지 못했습니다.<br>' + esc(e.message) + '</div>';
+      });
+  }
+
+  function stockText(it, qty) {
+    if (it.stock === '') return '재고 미관리';
+    var t = '재고 ' + it.stock + it.unit;
+    return qty > it.stock ? '<span class="warn">' + t + ' · 부족</span>' : t;
+  }
+
+  function renderList() {
+    var q = $('#q').value.trim().toLowerCase();
+    var list = ITEMS.filter(function (it) {
+      return !q || (it.name + ' ' + it.id + ' ' + it.spec).toLowerCase().indexOf(q) > -1;
+    });
+    if (!ITEMS.length) { $('#list').innerHTML = '<div class="msg">등록된 샘플이 없습니다.<br>시트의 샘플목록 탭에 품목을 추가하세요.</div>'; return; }
+    if (!list.length) { $('#list').innerHTML = '<div class="msg">‘' + esc(q) + '’와 일치하는 샘플이 없습니다.</div>'; return; }
+    $('#list').innerHTML = list.map(function (it) {
+      var qty = cart[it.id] || 0;
+      return '<div class="item' + (qty ? ' on' : '') + '" data-id="' + esc(it.id) + '">' +
+        '<div class="info"><div class="name">' + esc(it.name) + '</div>' +
+        '<div class="meta">' + esc(it.spec) + (it.spec ? ' · ' : '') + '<span class="st">' + stockText(it, qty) + '</span></div></div>' +
+        '<div class="step"><button type="button" data-d="-1" aria-label="빼기">−</button>' +
+        '<input type="number" inputmode="numeric" min="0" value="' + (qty || '') + '" placeholder="0" aria-label="수량">' +
+        '<button type="button" data-d="1" aria-label="더하기">+</button></div></div>';
+    }).join('');
+  }
+
+  function setQty(id, v) {
+    v = Math.max(0, parseInt(v, 10) || 0);
+    if (v) cart[id] = v; else delete cart[id];
+    var row = document.querySelector('.item[data-id="' + CSS.escape(id) + '"]');
+    if (row) {
+      row.classList.toggle('on', v > 0);
+      var inp = row.querySelector('input');
+      if (document.activeElement !== inp) inp.value = v || '';
+      row.querySelector('.st').innerHTML = stockText(byId(id), v);
+    }
+    updateBar();
+  }
+
+  function updateBar() {
+    var ids = Object.keys(cart), total = 0;
+    ids.forEach(function (id) { total += cart[id]; });
+    $('#sum').innerHTML = ids.length
+      ? '<b>' + ids.length + '개 품목 · 총 ' + total + '개</b>담은 목록에서 등록하세요'
+      : '<b>담긴 샘플 없음</b>수량을 눌러 담아 주세요';
+    $('#openCart').disabled = !ids.length;
+  }
+
+  function renderChips() {
+    $('#chips').innerHTML = PURPOSES.map(function (p) {
+      return '<button type="button" class="chip' + (p === purpose ? ' on' : '') + '" data-p="' + esc(p) + '">' + esc(p) + '</button>';
+    }).join('');
+  }
+
+  function renderCart() {
+    var ids = Object.keys(cart);
+    $('#cartBox').innerHTML = ids.map(function (id) {
+      var it = byId(id);
+      return '<div class="crow"><span class="n">' + esc(it.name) + (it.spec ? ' <small style="color:var(--sub)">' + esc(it.spec) + '</small>' : '') +
+        '</span><span class="q">' + cart[id] + esc(it.unit) + '</span>' +
+        '<button class="rm" data-rm="' + esc(id) + '">빼기</button></div>';
+    }).join('');
+  }
+
+  function openSheet() {
+    renderCart(); $('#err').textContent = '';
+    $('#formView').hidden = false; $('#doneView').hidden = true;
+    $('#overlay').classList.add('show'); $('#sheet').classList.add('show');
+  }
+  function closeSheet() { $('#overlay').classList.remove('show'); $('#sheet').classList.remove('show'); }
+
+  // 목록: +/− 버튼, 직접 입력
+  $('#list').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-d]'); if (!b) return;
+    var id = b.closest('.item').dataset.id;
+    setQty(id, (cart[id] || 0) + Number(b.dataset.d));
+  });
+  $('#list').addEventListener('input', function (e) {
+    if (e.target.tagName !== 'INPUT') return;
+    setQty(e.target.closest('.item').dataset.id, e.target.value);
+  });
+  $('#q').addEventListener('input', renderList);
+
+  $('#openCart').addEventListener('click', openSheet);
+  $('#closeSheet').addEventListener('click', closeSheet);
+  $('#overlay').addEventListener('click', closeSheet);
+
+  $('#cartBox').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rm]'); if (!b) return;
+    setQty(b.dataset.rm, 0);
+    if (!Object.keys(cart).length) closeSheet(); else renderCart();
+  });
+  $('#chips').addEventListener('click', function (e) {
+    var c = e.target.closest('.chip'); if (!c) return;
+    purpose = c.dataset.p; renderChips();
+  });
+
+  // 담당자·부서는 다음 사용 때 자동으로 채움
+  try {
+    $('#user').value = localStorage.getItem('smp_user') || '';
+    $('#dept').value = localStorage.getItem('smp_dept') || '';
+  } catch (e) {}
+
+  $('#submit').addEventListener('click', function () {
+    var user = $('#user').value.trim();
+    if (!user) { $('#err').textContent = '담당자 이름을 입력하세요.'; $('#user').focus(); return; }
+    if (!purpose) { $('#err').textContent = '사용 구분을 선택하세요.'; return; }
+
+    var payload = {
+      user: user, dept: $('#dept').value.trim(), purpose: purpose,
+      client: $('#client').value.trim(), memo: $('#memo').value.trim(),
+      items: Object.keys(cart).map(function (id) { return { id: id, qty: cart[id] }; })
+    };
+    try { localStorage.setItem('smp_user', payload.user); localStorage.setItem('smp_dept', payload.dept); } catch (e) {}
+
+    var btn = $('#submit'); btn.disabled = true; btn.textContent = '등록하는 중…'; $('#err').textContent = '';
+    apiSubmit(payload)
+      .then(function (r) {
+        btn.disabled = false; btn.textContent = '출고 등록';
+        $('#doneText').innerHTML = esc(r.count) + '개 품목, 총 ' + esc(r.total) + '개<br>요청번호 ' + esc(r.reqNo);
+        $('#formView').hidden = true; $('#doneView').hidden = false;
+        cart = {}; purpose = ''; $('#client').value = ''; $('#memo').value = '';
+        renderChips(); updateBar(); load();
+      })
+      .catch(function (e) {
+        btn.disabled = false; btn.textContent = '출고 등록';
+        $('#err').textContent = String(e.message || e).replace(/^Error:\s*/, '');
+      });
+  });
+
+  $('#again').addEventListener('click', function () { closeSheet(); window.scrollTo(0, 0); });
+
+  load();
+</script>
+</body>
+</html>
