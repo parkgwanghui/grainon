@@ -27,6 +27,17 @@
   .seg button{border:0;background:transparent;color:#fff;font-size:14px;font-weight:600;padding:7px 12px;border-radius:8px;cursor:pointer}
   .seg button.on{background:#fff;color:var(--main-d)}
   .hbtn{border:0;background:rgba(255,255,255,.22);color:#fff;border-radius:8px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .ptop{display:flex;gap:6px;margin:0 0 10px}
+  .ptop button{flex:1;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;border-radius:10px;padding:9px;font-size:15px;font-weight:600;cursor:pointer}
+  .ptop button.on{background:#fff;color:var(--main-d);border-color:#fff}
+  .ptop.need button{border-color:var(--amber)}
+  body.stock .ptop{display:none}
+  .sq2{flex:none;display:flex;gap:14px;text-align:right;font-variant-numeric:tabular-nums}
+  .sq2 div{min-width:48px}
+  .sq2 .pl{display:block;font-size:11.5px;color:var(--sub);font-weight:500}
+  .sq2 b{font-size:18px}.sq2 small{font-size:12px;color:var(--sub);margin-left:1px}
+  .sq2 .zero b{color:var(--red)}.sq2 .none{font-size:12px;color:var(--sub)}
+  .placeline{font-size:14px;color:var(--sub);margin:-2px 0 12px}.placeline b{color:var(--ink);font-size:15px}
   .search{width:100%;border:0;border-radius:10px;padding:12px;font-size:16px;color:var(--ink)}
 
   main{padding:10px 12px 120px;max-width:640px;margin:0 auto}
@@ -119,6 +130,7 @@
     </div>
   </div>
   <p id="subtitle"></p>
+  <div class="ptop" id="ptop" role="group" aria-label="장소 선택"></div>
   <input id="q" class="search" type="search" placeholder="제품명·샘플ID 검색" autocomplete="off">
 </header>
 
@@ -139,7 +151,7 @@
       <div class="field"><label for="user">담당자<span class="req">*</span></label><input id="user" autocomplete="name"></div>
       <div class="field"><label for="dept">부서<span class="req">*</span></label><input id="dept"></div>
     </div>
-    <div class="field"><span class="lb">장소<span class="req">*</span></span><div class="chips big" id="places"></div></div>
+    <div class="placeline" id="placeLine"></div>
     <div class="field"><span class="lb" id="purposeLabel">사용 구분<span class="req">*</span></span><div class="chips" id="chips"></div></div>
     <div class="field"><label for="client" id="clientLabel">제공처 <small>고객사·행사명 등</small></label><input id="client"></div>
     <div class="field"><label for="memo">비고 <small>선택</small></label><textarea id="memo"></textarea></div>
@@ -241,15 +253,18 @@
   }
 
   /* 목록 */
+  function st(it, p) { var v = it.stock && it.stock[p]; return v === undefined ? '' : v; }
   function avail(it) {
-    if (it.stock === '') return '';
-    var s = it.stock;
-    if (editing && editing.type === 'out') editing.items.forEach(function (x) { if (x.id === it.id) s += x.qty; });
+    var s = st(it, place);
+    if (s === '') return '';
+    if (editing && editing.type === 'out' && editing.place === place) editing.items.forEach(function (x) { if (x.id === it.id) s += x.qty; });
     return s;
   }
   function stockText(it, qty) {
-    if (it.stock === '') return '재고 미관리';
-    var t = '재고 ' + it.stock + esc(it.unit);
+    if (!place) return '장소를 먼저 선택하세요';
+    var s = st(it, place);
+    if (s === '') return place + ' 재고 미관리';
+    var t = place + ' 재고 ' + s + esc(it.unit);
     return (mode === 'out' && qty > avail(it)) ? '<span class="warn">' + t + ' · 부족</span>' : t;
   }
   function renderList() {
@@ -259,8 +274,11 @@
     if (!list.length) { $('#list').innerHTML = '<div class="msg">‘' + esc(q) + '’와 일치하는 샘플이 없습니다.</div>'; return; }
     if (mode === 'stock') {
       $('#list').innerHTML = list.map(function (it) {
-        var sq = it.stock === '' ? '<div class="sq none">재고 미관리</div>'
-          : '<div class="sq' + (it.stock <= 0 ? ' zero' : '') + '">' + esc(it.stock) + '<small>' + esc(it.unit) + '</small></div>';
+        var sq = '<div class="sq2">' + PLACES.map(function (p) {
+          var s = st(it, p);
+          return s === '' ? '<div><span class="pl">' + esc(p) + '</span><span class="none">미관리</span></div>'
+            : '<div class="' + (s <= 0 ? 'zero' : '') + '"><span class="pl">' + esc(p) + '</span><b>' + esc(s) + '</b><small>' + esc(it.unit) + '</small></div>';
+        }).join('') + '</div>';
         return '<div class="item"><div class="info"><div class="name">' + esc(it.name) + '</div><div class="meta">' +
           esc(it.spec) + (it.spec ? ' · ' : '') + esc(it.id) + '</div></div>' + sq + '</div>';
       }).join('');
@@ -306,7 +324,19 @@
   }
   function renderChips() {
     $('#chips').innerHTML = chipHtml(mode === 'in' ? IN_PURPOSES : PURPOSES, purpose, 'data-p');
-    $('#places').innerHTML = chipHtml(PLACES, place, 'data-pl');
+    renderPlaces();
+  }
+  function renderPlaces() {
+    $('#ptop').innerHTML = PLACES.map(function (p) {
+      return '<button type="button" data-pl="' + esc(p) + '" class="' + (p === place ? 'on' : '') + '">' + esc(p) + '</button>';
+    }).join('');
+    $('#ptop').classList.toggle('need', !place);
+    $('#placeLine').innerHTML = place ? '장소 <b>' + esc(place) + '</b> · 바꾸려면 화면 위에서 선택하세요' : '';
+  }
+  function setPlace(p) {
+    if (PLACES.indexOf(p) < 0) return;
+    place = p; store('smp_place', p);
+    renderPlaces(); renderList();
   }
 
   /* 시트(아래에서 올라오는 창) */
@@ -360,7 +390,7 @@
     if (!r) { toast('수정 가능 시간이 지났어요.'); return; }
     editing = r;
     setMode(r.type === 'in' ? 'in' : 'out');
-    purpose = r.purpose; place = r.place;
+    purpose = r.purpose; place = r.place; store('smp_place', place);
     cart = {};
     var missing = 0;
     r.items.forEach(function (it) { if (byId(it.id)) cart[it.id] = it.qty; else missing++; });
@@ -385,11 +415,14 @@
   /* 이벤트 */
   $('#list').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-d]'); if (!b) return;
+    if (!place) { toast('먼저 위에서 장소(본관/별관)를 선택하세요.'); return; }
     var id = b.closest('.item').dataset.id;
     setQty(id, (cart[id] || 0) + Number(b.dataset.d));
   });
   $('#list').addEventListener('input', function (e) {
-    if (e.target.tagName === 'INPUT') setQty(e.target.closest('.item').dataset.id, e.target.value);
+    if (e.target.tagName !== 'INPUT') return;
+    if (!place) { e.target.value = ''; toast('먼저 위에서 장소(본관/별관)를 선택하세요.'); return; }
+    setQty(e.target.closest('.item').dataset.id, e.target.value);
   });
   $('#q').addEventListener('input', renderList);
   document.querySelector('.seg').addEventListener('click', function (e) {
@@ -399,6 +432,7 @@
   });
   $('header').addEventListener('click', function (e) {
     var a = e.target.dataset && e.target.dataset.act;
+    var pb = e.target.closest('[data-pl]'); if (pb) setPlace(pb.dataset.pl);
     if (a === 'refresh') { e.target.textContent = '갱신 중…'; load(); }
     if (a === 'recent') { renderRecent(); showView('recent'); }
   });
@@ -427,7 +461,7 @@
 
   $('#submit').addEventListener('click', function () {
     var user = $('#user').value.trim(), dept = $('#dept').value.trim();
-    var err = !user ? '담당자 이름을 입력하세요.' : !dept ? '부서를 입력하세요.' : !place ? '장소(본관/별관)를 선택하세요.'
+    var err = !user ? '담당자 이름을 입력하세요.' : !dept ? '부서를 입력하세요.' : !place ? '화면 위에서 장소(본관/별관)를 선택하세요.'
       : !purpose ? (mode === 'in' ? '입고' : '사용') + ' 구분을 선택하세요.' : '';
     if (err) { $('#err').textContent = err; return; }
 
