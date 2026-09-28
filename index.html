@@ -9,6 +9,7 @@
   :root{
     --bg:#F1F4F1; --card:#FFFFFF; --ink:#17211B; --sub:#5C6A61; --line:#D8E0DA;
     --green:#2D6A4F; --green-d:#1E4D38; --amber:#F2B233; --red:#B9400E;
+    --main:var(--green); --main-d:var(--green-d);
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -17,7 +18,12 @@
   button,input,textarea{font-family:inherit}
   button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--amber);outline-offset:1px}
 
-  header{position:sticky;top:0;z-index:5;background:var(--green);color:#fff;
+  body.in{--main:#2F5A8A; --main-d:#1F3F63}
+  .htop{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .seg{display:flex;background:rgba(255,255,255,.18);border-radius:10px;padding:3px;flex:none}
+  .seg button{border:0;background:transparent;color:#fff;font-size:14px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .seg button.on{background:#fff;color:var(--main-d)}
+  header{position:sticky;top:0;z-index:5;background:var(--main);color:#fff;
     padding:calc(14px + env(safe-area-inset-top)) 16px 12px}
   header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
   header p{margin:3px 0 12px;font-size:13px;opacity:.82}
@@ -28,14 +34,14 @@
 
   .item{display:flex;align-items:center;gap:10px;background:var(--card);
     border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}
-  .item.on{border-color:var(--green);box-shadow:inset 4px 0 0 var(--green)}
+  .item.on{border-color:var(--main);box-shadow:inset 4px 0 0 var(--main)}
   .info{flex:1;min-width:0}
   .name{font-size:15.5px;font-weight:600;line-height:1.35}
   .meta{font-size:12.5px;color:var(--sub);margin-top:3px}
   .meta .warn{color:var(--red);font-weight:600}
 
   .step{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none}
-  .step button{width:40px;height:40px;border:0;background:#F5F8F5;font-size:21px;color:var(--green-d);cursor:pointer}
+  .step button{width:40px;height:40px;border:0;background:#F5F8F5;font-size:21px;color:var(--main-d);cursor:pointer}
   .step input{width:46px;height:40px;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);
     text-align:center;font-size:16px;color:var(--ink);-moz-appearance:textfield}
   .step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -44,11 +50,11 @@
     padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center}
   .bar .sum{flex:1;font-size:13.5px;color:var(--sub)}
   .bar .sum b{display:block;color:var(--ink);font-size:17px}
-  .btn{border:0;border-radius:12px;background:var(--green);color:#fff;font-size:16px;font-weight:600;
+  .btn{border:0;border-radius:12px;background:var(--main);color:#fff;font-size:16px;font-weight:600;
     padding:14px 22px;cursor:pointer}
   .btn:disabled{background:#AEB9B1;cursor:default}
   .btn.full{width:100%;margin-top:6px}
-  .btn.ghost{background:transparent;color:var(--green-d);border:1px solid var(--line)}
+  .btn.ghost{background:transparent;color:var(--main-d);border:1px solid var(--line)}
 
   .overlay{position:fixed;inset:0;background:rgba(23,33,27,.45);z-index:10;display:none}
   .overlay.show{display:block}
@@ -77,11 +83,11 @@
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-size:14px;
     color:var(--ink);cursor:pointer}
-  .chip.on{background:var(--green);border-color:var(--green);color:#fff}
+  .chip.on{background:var(--main);border-color:var(--main);color:#fff}
   .err{color:var(--red);font-size:13.5px;min-height:18px;margin:4px 0}
 
   .done{text-align:center;padding:24px 8px 8px}
-  .done .big{font-size:40px;line-height:1;color:var(--green)}
+  .done .big{font-size:40px;line-height:1;color:var(--main)}
   .done h2{margin:12px 0 6px;font-size:19px}
   .done p{margin:0 0 18px;color:var(--sub);font-size:14px;line-height:1.6}
 
@@ -91,8 +97,14 @@
 <body>
 
 <header>
-  <h1>샘플 출고</h1>
-  <p>필요한 샘플을 모두 담고 한 번에 등록하세요</p>
+  <div class="htop">
+    <h1 id="title">샘플 출고</h1>
+    <div class="seg" role="group" aria-label="출고 또는 입고">
+      <button type="button" class="on" data-mode="out">출고</button>
+      <button type="button" data-mode="in">입고</button>
+    </div>
+  </div>
+  <p id="subtitle">필요한 샘플을 모두 담고 한 번에 등록하세요</p>
   <input id="q" class="search" type="search" placeholder="제품명·샘플ID 검색" autocomplete="off">
 </header>
 
@@ -107,7 +119,7 @@
 <section class="sheet" id="sheet" aria-label="출고 등록">
   <div id="formView">
     <div class="sheet-head">
-      <h2>출고 등록</h2>
+      <h2 id="sheetTitle">출고 등록</h2>
       <button class="x" id="closeSheet">닫기</button>
     </div>
     <div class="box" id="cartBox"></div>
@@ -117,11 +129,11 @@
       <div class="field"><label for="dept">부서 <small>선택</small></label><input id="dept"></div>
     </div>
     <div class="field">
-      <label>사용 구분</label>
+      <label id="purposeLabel">사용 구분</label>
       <div class="chips" id="chips"></div>
     </div>
     <div class="field">
-      <label for="client">제공처 <small>고객사·행사명 등</small></label>
+      <label for="client" id="clientLabel">제공처 <small>고객사·행사명 등</small></label>
       <input id="client">
     </div>
     <div class="field">
@@ -135,7 +147,7 @@
   <div id="doneView" hidden>
     <div class="done">
       <div class="big">✓</div>
-      <h2>출고가 등록됐어요</h2>
+      <h2 id="doneTitle">출고가 등록됐어요</h2>
       <p id="doneText"></p>
       <button class="btn full" id="again">새로 담기</button>
     </div>
@@ -159,7 +171,8 @@
       .then(function (r) { return r.json(); }).then(unwrap).catch(function (e) { throw netErr(e); });
   }
 
-  var ITEMS = [], PURPOSES = [], cart = {}, purpose = '';
+  var ITEMS = [], PURPOSES = [], IN_PURPOSES = [], cart = {}, purpose = '', mode = 'out';
+  function word() { return mode === 'in' ? '입고' : '출고'; }
   var $ = function (s) { return document.querySelector(s); };
 
   function esc(s) {
@@ -172,7 +185,7 @@
   function load() {
     apiInit()
       .then(function (d) {
-        ITEMS = d.items; PURPOSES = d.purposes;
+        ITEMS = d.items; PURPOSES = d.purposes; IN_PURPOSES = d.inPurposes || [];
         renderList(); renderChips();
       })
       .catch(function (e) {
@@ -183,7 +196,7 @@
   function stockText(it, qty) {
     if (it.stock === '') return '재고 미관리';
     var t = '재고 ' + it.stock + it.unit;
-    return qty > it.stock ? '<span class="warn">' + t + ' · 부족</span>' : t;
+    return (mode === 'out' && qty > it.stock) ? '<span class="warn">' + t + ' · 부족</span>' : t;
   }
 
   function renderList() {
@@ -227,7 +240,8 @@
   }
 
   function renderChips() {
-    $('#chips').innerHTML = PURPOSES.map(function (p) {
+    var list = mode === 'in' ? IN_PURPOSES : PURPOSES;
+    $('#chips').innerHTML = list.map(function (p) {
       return '<button type="button" class="chip' + (p === purpose ? ' on' : '') + '" data-p="' + esc(p) + '">' + esc(p) + '</button>';
     }).join('');
   }
@@ -261,6 +275,23 @@
   });
   $('#q').addEventListener('input', renderList);
 
+  function setMode(m) {
+    mode = m; purpose = '';
+    document.body.classList.toggle('in', m === 'in');
+    document.querySelectorAll('.seg button').forEach(function (b) { b.classList.toggle('on', b.dataset.mode === m); });
+    var w = word();
+    $('#title').textContent = '샘플 ' + w;
+    $('#subtitle').textContent = m === 'in' ? '들어온 샘플을 모두 담고 한 번에 등록하세요' : '필요한 샘플을 모두 담고 한 번에 등록하세요';
+    $('#sheetTitle').textContent = w + ' 등록';
+    $('#submit').textContent = w + ' 등록';
+    $('#purposeLabel').textContent = m === 'in' ? '입고 구분' : '사용 구분';
+    $('#clientLabel').innerHTML = m === 'in' ? '입고처 <small>공급처·반납자 등</small>' : '제공처 <small>고객사·행사명 등</small>';
+    renderChips(); renderList();
+  }
+  document.querySelector('.seg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-mode]'); if (b && b.dataset.mode !== mode) setMode(b.dataset.mode);
+  });
+
   $('#openCart').addEventListener('click', openSheet);
   $('#closeSheet').addEventListener('click', closeSheet);
   $('#overlay').addEventListener('click', closeSheet);
@@ -284,10 +315,10 @@
   $('#submit').addEventListener('click', function () {
     var user = $('#user').value.trim();
     if (!user) { $('#err').textContent = '담당자 이름을 입력하세요.'; $('#user').focus(); return; }
-    if (!purpose) { $('#err').textContent = '사용 구분을 선택하세요.'; return; }
+    if (!purpose) { $('#err').textContent = (mode === 'in' ? '입고' : '사용') + ' 구분을 선택하세요.'; return; }
 
     var payload = {
-      user: user, dept: $('#dept').value.trim(), purpose: purpose,
+      type: mode, user: user, dept: $('#dept').value.trim(), purpose: purpose,
       client: $('#client').value.trim(), memo: $('#memo').value.trim(),
       items: Object.keys(cart).map(function (id) { return { id: id, qty: cart[id] }; })
     };
@@ -296,14 +327,15 @@
     var btn = $('#submit'); btn.disabled = true; btn.textContent = '등록하는 중…'; $('#err').textContent = '';
     apiSubmit(payload)
       .then(function (r) {
-        btn.disabled = false; btn.textContent = '출고 등록';
+        btn.disabled = false; btn.textContent = word() + ' 등록';
         $('#doneText').innerHTML = esc(r.count) + '개 품목, 총 ' + esc(r.total) + '개<br>요청번호 ' + esc(r.reqNo);
+        $('#doneTitle').textContent = word() + '가 등록됐어요';
         $('#formView').hidden = true; $('#doneView').hidden = false;
         cart = {}; purpose = ''; $('#client').value = ''; $('#memo').value = '';
         renderChips(); updateBar(); load();
       })
       .catch(function (e) {
-        btn.disabled = false; btn.textContent = '출고 등록';
+        btn.disabled = false; btn.textContent = word() + ' 등록';
         $('#err').textContent = String(e.message || e).replace(/^Error:\s*/, '');
       });
   });
