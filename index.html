@@ -19,9 +19,17 @@
   button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--amber);outline-offset:1px}
 
   body.in{--main:#2F5A8A; --main-d:#1F3F63}
+  body.stock{--main:#3D4842; --main-d:#27302B}
+  body.stock .bar{display:none}
+  body.stock main{padding-bottom:30px}
+  .sq{flex:none;text-align:right;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+  .sq small{font-size:13px;font-weight:500;color:var(--sub);margin-left:2px}
+  .sq.zero{color:var(--red)}
+  .sq.none{font-size:13px;font-weight:500;color:var(--sub)}
+  .refresh{border:0;background:rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:4px 10px;font-size:12.5px;margin-left:6px;cursor:pointer}
   .htop{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .seg{display:flex;background:rgba(255,255,255,.18);border-radius:10px;padding:3px;flex:none}
-  .seg button{border:0;background:transparent;color:#fff;font-size:14px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .seg button{border:0;background:transparent;color:#fff;font-size:14px;font-weight:600;padding:7px 12px;border-radius:8px;cursor:pointer}
   .seg button.on{background:#fff;color:var(--main-d)}
   header{position:sticky;top:0;z-index:5;background:var(--main);color:#fff;
     padding:calc(14px + env(safe-area-inset-top)) 16px 12px}
@@ -102,6 +110,7 @@
     <div class="seg" role="group" aria-label="출고 또는 입고">
       <button type="button" class="on" data-mode="out">출고</button>
       <button type="button" data-mode="in">입고</button>
+      <button type="button" data-mode="stock">재고</button>
     </div>
   </div>
   <p id="subtitle">필요한 샘플을 모두 담고 한 번에 등록하세요</p>
@@ -171,7 +180,12 @@
       .then(function (r) { return r.json(); }).then(unwrap).catch(function (e) { throw netErr(e); });
   }
 
-  var ITEMS = [], PURPOSES = [], IN_PURPOSES = [], cart = {}, purpose = '', mode = 'out';
+  var ITEMS = [], PURPOSES = [], IN_PURPOSES = [], cart = {}, purpose = '', mode = 'out', lastLoaded = null;
+  function hhmm(d) { return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2); }
+  function stockSubtitle() {
+    $('#subtitle').innerHTML = (lastLoaded ? hhmm(lastLoaded) + ' 기준 · 30초마다 자동 갱신' : '불러오는 중…') +
+      '<button type="button" class="refresh" id="refresh">새로고침</button>';
+  }
   function word() { return mode === 'in' ? '입고' : '출고'; }
   var $ = function (s) { return document.querySelector(s); };
 
@@ -186,6 +200,8 @@
     apiInit()
       .then(function (d) {
         ITEMS = d.items; PURPOSES = d.purposes; IN_PURPOSES = d.inPurposes || [];
+        lastLoaded = new Date();
+        if (mode === 'stock') stockSubtitle();
         renderList(); renderChips();
       })
       .catch(function (e) {
@@ -206,6 +222,16 @@
     });
     if (!ITEMS.length) { $('#list').innerHTML = '<div class="msg">등록된 샘플이 없습니다.<br>시트의 샘플목록 탭에 품목을 추가하세요.</div>'; return; }
     if (!list.length) { $('#list').innerHTML = '<div class="msg">‘' + esc(q) + '’와 일치하는 샘플이 없습니다.</div>'; return; }
+    if (mode === 'stock') {
+      $('#list').innerHTML = list.map(function (it) {
+        var sq = it.stock === ''
+          ? '<div class="sq none">재고 미관리</div>'
+          : '<div class="sq' + (it.stock <= 0 ? ' zero' : '') + '">' + esc(it.stock) + '<small>' + esc(it.unit) + '</small></div>';
+        return '<div class="item"><div class="info"><div class="name">' + esc(it.name) + '</div>' +
+          '<div class="meta">' + esc(it.spec) + (it.spec ? ' · ' : '') + esc(it.id) + '</div></div>' + sq + '</div>';
+      }).join('');
+      return;
+    }
     $('#list').innerHTML = list.map(function (it) {
       var qty = cart[it.id] || 0;
       return '<div class="item' + (qty ? ' on' : '') + '" data-id="' + esc(it.id) + '">' +
@@ -278,6 +304,7 @@
   function setMode(m) {
     mode = m; purpose = '';
     document.body.classList.toggle('in', m === 'in');
+    document.body.classList.toggle('stock', m === 'stock');
     document.querySelectorAll('.seg button').forEach(function (b) { b.classList.toggle('on', b.dataset.mode === m); });
     var w = word();
     $('#title').textContent = '샘플 ' + w;
@@ -286,8 +313,12 @@
     $('#submit').textContent = w + ' 등록';
     $('#purposeLabel').textContent = m === 'in' ? '입고 구분' : '사용 구분';
     $('#clientLabel').innerHTML = m === 'in' ? '입고처 <small>공급처·반납자 등</small>' : '제공처 <small>고객사·행사명 등</small>';
+    if (m === 'stock') { $('#title').textContent = '샘플 재고'; stockSubtitle(); load(); }
     renderChips(); renderList();
   }
+  $('header').addEventListener('click', function (e) { if (e.target.id === 'refresh') { e.target.textContent = '갱신 중…'; load(); } });
+  setInterval(function () { if (mode === 'stock' && !document.hidden) load(); }, 30000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && mode === 'stock') load(); });
   document.querySelector('.seg').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-mode]'); if (b && b.dataset.mode !== mode) setMode(b.dataset.mode);
   });
