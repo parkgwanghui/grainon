@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>샘플 출고</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root{
     --bg:#F1F4F1; --card:#FFFFFF; --ink:#17211B; --sub:#5C6A61; --line:#D8E0DA;
@@ -32,12 +33,33 @@
   .ptop button.on{background:#fff;color:var(--main-d);border-color:#fff}
   .ptop.need button{border-color:var(--amber)}
   body.stock .ptop{display:none}
+  .toast{z-index:40}
   .sq2{flex:none;display:flex;gap:14px;text-align:right;font-variant-numeric:tabular-nums}
   .sq2 div{min-width:48px}
   .sq2 .pl{display:block;font-size:11.5px;color:var(--sub);font-weight:500}
   .sq2 b{font-size:18px}.sq2 small{font-size:12px;color:var(--sub);margin-left:1px}
   .sq2 .zero b{color:var(--red)}.sq2 .none{font-size:12px;color:var(--sub)}
   .placeline{font-size:14px;color:var(--sub);margin:-2px 0 12px}.placeline b{color:var(--ink);font-size:15px}
+  .srow{display:flex;gap:8px}
+  .scanbtn{flex:none;border:0;border-radius:10px;background:#fff;color:var(--main-d);font-weight:700;font-size:15px;padding:0 14px;cursor:pointer}
+  .scan{position:fixed;inset:0;z-index:30;background:#0E1411;color:#fff;display:flex;flex-direction:column;
+    padding:calc(12px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom))}
+  .scan[hidden]{display:none}
+  .scan-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .scan-top b{font-size:18px}.scan-top span{flex:1;font-size:13px;opacity:.75}
+  .scan-top button{border:0;border-radius:10px;background:#fff;color:#0E1411;font-weight:700;font-size:15px;padding:9px 16px;cursor:pointer}
+  #reader{width:100%;max-width:520px;margin:0 auto;border-radius:14px;overflow:hidden;background:#000;min-height:220px}
+  #reader video{width:100% !important;height:auto !important;display:block}
+  .scan-msg{text-align:center;font-size:14.5px;margin:12px 0;min-height:22px;line-height:1.5}
+  .scan-msg.bad{color:#FFB199}.scan-msg.good{color:#9BE3B8}
+  .scan-card{background:#fff;color:var(--ink);border-radius:14px;padding:14px;max-width:520px;width:100%;margin:0 auto}
+  .scan-card[hidden]{display:none}
+  .scan-card .name{font-size:17px}
+  .scan-card .qrow{display:flex;align-items:center;justify-content:space-between;margin:12px 0 4px}
+  .scan-card .qrow .step button{width:52px;height:48px;font-size:24px}
+  .scan-card .qrow .step input{width:64px;height:48px;font-size:19px;font-weight:700}
+  .scan-foot{margin-top:auto;text-align:center;font-size:14px;opacity:.85;padding-top:10px}
+  .toast{z-index:40 !important}
   .search{width:100%;border:0;border-radius:10px;padding:12px;font-size:16px;color:var(--ink)}
 
   main{padding:10px 12px 120px;max-width:640px;margin:0 auto}
@@ -61,6 +83,8 @@
   .bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#fff;border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center}
   body.stock .bar{display:none}
   .bar .sum{flex:1;font-size:13.5px;color:var(--sub)}
+  .bar .clr{padding:14px 14px;color:var(--red);border-color:#E9C9BA}
+  .bar .clr[hidden]{display:none}
   .bar .sum b{display:block;color:var(--ink);font-size:17px}
   .btn{border:0;border-radius:12px;background:var(--main);color:#fff;font-size:16px;font-weight:600;padding:14px 22px;cursor:pointer}
   .btn:disabled{background:#AEB9B1;cursor:default}
@@ -131,20 +155,24 @@
   </div>
   <p id="subtitle"></p>
   <div class="ptop" id="ptop" role="group" aria-label="장소 선택"></div>
-  <input id="q" class="search" type="search" placeholder="제품명·샘플ID 검색" autocomplete="off">
+  <div class="srow">
+    <input id="q" class="search" type="search" placeholder="제품명·샘플ID·바코드 검색" autocomplete="off" enterkeyhint="search">
+    <button type="button" class="scanbtn" id="scanBtn" aria-label="바코드 스캔">📷 스캔</button>
+  </div>
 </header>
 
 <main id="list"><div class="msg">샘플 목록을 불러오는 중…</div></main>
 
 <div class="bar">
   <div class="sum" id="sum"></div>
+  <button class="btn line clr" id="clearCart" hidden>비우기</button>
   <button class="btn" id="openCart" disabled>담은 목록 보기</button>
 </div>
 
 <div class="overlay" id="overlay"></div>
 <section class="sheet" id="sheet" aria-label="등록">
   <div id="formView">
-    <div class="sheet-head"><h2 id="sheetTitle">출고 등록</h2><button class="x" data-act="close">닫기</button></div>
+    <div class="sheet-head"><h2 id="sheetTitle">출고 등록</h2><div><button class="x" data-act="clearAll" style="color:var(--red)">전체 비우기</button><button class="x" data-act="close">닫기</button></div></div>
     <div id="editBanner"></div>
     <div class="box" id="cartBox"></div>
     <div class="two">
@@ -179,6 +207,25 @@
     <div class="hint" id="recentHint"></div>
   </div>
 </section>
+
+<div class="scan" id="scan" hidden>
+  <div class="scan-top"><b>바코드 스캔</b><span id="scanInfo"></span><button type="button" data-sact="close">완료</button></div>
+  <div id="reader"></div>
+  <div class="scan-msg" id="scanMsg">바코드를 네모 칸 안에 맞춰 주세요</div>
+  <div class="scan-card" id="scanCard" hidden>
+    <div class="name" id="scName"></div>
+    <div class="meta" id="scMeta"></div>
+    <div class="qrow">
+      <span id="scNow" style="font-size:14px;color:var(--sub)"></span>
+      <div class="step"><button type="button" data-sact="minus" aria-label="빼기">−</button>
+        <input type="number" inputmode="numeric" min="1" id="scQty" aria-label="담을 수량">
+        <button type="button" data-sact="plus" aria-label="더하기">+</button></div>
+    </div>
+    <div class="btnrow"><button type="button" class="btn line" data-sact="skip">다시 스캔</button>
+      <button type="button" class="btn" data-sact="add">담기</button></div>
+  </div>
+  <div class="scan-foot" id="scanFoot"></div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -277,7 +324,7 @@
   }
   function renderList() {
     var q = $('#q').value.trim().toLowerCase();
-    var list = ITEMS.filter(function (it) { return !q || (it.name + ' ' + it.id + ' ' + it.spec).toLowerCase().indexOf(q) > -1; });
+    var list = ITEMS.filter(function (it) { return !q || (it.name + ' ' + it.id + ' ' + it.spec + ' ' + (it.codes || []).join(' ')).toLowerCase().indexOf(q) > -1; });
     if (!ITEMS.length) { $('#list').innerHTML = '<div class="msg">등록된 샘플이 없습니다.<br>시트의 샘플목록 탭에 품목을 추가하세요.</div>'; return; }
     if (!list.length) { $('#list').innerHTML = '<div class="msg">‘' + esc(q) + '’와 일치하는 샘플이 없습니다.</div>'; return; }
     if (mode === 'stock') {
@@ -322,6 +369,13 @@
       ? '<b>' + pre + ids.length + '개 품목 · 총 ' + total + '개</b>담은 목록에서 등록하세요'
       : '<b>' + (editing ? '수정 중 · ' : '') + '담긴 샘플 없음</b>수량을 눌러 담아 주세요';
     $('#openCart').disabled = !ids.length;
+    $('#clearCart').hidden = !ids.length;
+  }
+  function clearCart() {
+    var n = Object.keys(cart).length; if (!n) return false;
+    if (!confirm('담은 ' + n + '개 품목의 수량을 모두 비울까요?')) return false;
+    cart = {}; renderList(); updateBar(); toast('장바구니를 비웠어요.');
+    return true;
   }
 
   /* 선택 칩 */
@@ -445,6 +499,7 @@
     if (a === 'recent') { renderRecent(); showView('recent'); }
   });
   $('#openCart').addEventListener('click', openForm);
+  $('#clearCart').addEventListener('click', clearCart);
   $('#overlay').addEventListener('click', closeSheet);
 
   $('#sheet').addEventListener('click', function (e) {
@@ -456,6 +511,7 @@
     else if (d.edit) startEdit(findRecent(d.edit));
     else if (d.cancel) doCancel(findRecent(d.cancel));
     else if (d.act === 'close') closeSheet();
+    else if (d.act === 'clearAll') { if (clearCart()) closeSheet(); }
     else if (d.act === 'stopEdit') stopEdit();
     else if (d.act === 'again') { closeSheet(); window.scrollTo(0, 0); }
     else if (d.act === 'editLast') startEdit(lastDone && findRecent(lastDone.reqNo));
@@ -502,6 +558,107 @@
       $('#err').textContent = String(e.message || e).replace(/^Error:\s*/, '');
     });
   });
+
+  /* ---------- 바코드 ---------- */
+  function norm(s) { s = String(s || '').trim(); return /^\d+$/.test(s) ? s.replace(/^0+/, '') : s.toUpperCase(); }
+  function findByCode(code) {
+    var k = norm(code); if (!k) return null;
+    for (var i = 0; i < ITEMS.length; i++) {
+      var it = ITEMS[i];
+      if (norm(it.id) === k) return it;
+      var cs = it.codes || [];
+      for (var j = 0; j < cs.length; j++) if (norm(cs[j]) === k) return it;
+    }
+    return null;
+  }
+  function beep(ok) { try { if (navigator.vibrate) navigator.vibrate(ok ? 60 : [120, 60, 120]); } catch (e) {} }
+
+  // 블루투스·USB 바코드 스캐너(키보드처럼 입력 후 Enter) 지원
+  $('#q').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var it = findByCode(this.value); if (!it) return;
+    e.preventDefault();
+    if (mode === 'stock') { this.value = it.id; renderList(); return; }
+    if (!place) { toast('먼저 위에서 장소(본관/별관)를 선택하세요.'); return; }
+    setQty(it.id, (cart[it.id] || 0) + 1);
+    toast(it.name + ' 1' + it.unit + ' 담았어요 (총 ' + cart[it.id] + it.unit + ')');
+    beep(true); this.value = ''; renderList();
+  });
+
+  var scanner = null, scanBusy = false, scanItem = null, lastCode = '', lastAt = 0, scanAdded = 0;
+  function scanFoot() {
+    var ids = Object.keys(cart), total = 0; ids.forEach(function (id) { total += cart[id]; });
+    $('#scanFoot').textContent = mode === 'stock' ? '찍으면 해당 품목의 재고를 보여 드려요'
+      : '장바구니 ' + ids.length + '개 품목 · 총 ' + total + '개' + (scanAdded ? ' (이번 스캔 ' + scanAdded + '건)' : '');
+  }
+  function scanMsg(t, cls) { var el = $('#scanMsg'); el.textContent = t; el.className = 'scan-msg' + (cls ? ' ' + cls : ''); }
+  function openScanner() {
+    if (mode !== 'stock' && !place) { toast('먼저 위에서 장소(본관/별관)를 선택하세요.'); return; }
+    if (typeof Html5Qrcode === 'undefined') { toast('스캔 기능을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.'); return; }
+    scanBusy = false; scanItem = null; scanAdded = 0; lastCode = '';
+    $('#scan').hidden = false; $('#scanCard').hidden = true;
+    $('#scanInfo').textContent = mode === 'stock' ? '재고 확인' : place + ' · ' + word();
+    scanMsg('바코드를 네모 칸 안에 맞춰 주세요'); scanFoot();
+    var F = Html5QrcodeSupportedFormats;
+    scanner = new Html5Qrcode('reader', {
+      verbose: false,
+      formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE],
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    });
+    scanner.start({ facingMode: 'environment' }, {
+      fps: 10,
+      qrbox: function (w, h) { return { width: Math.floor(Math.min(w * 0.85, 360)), height: Math.floor(Math.min(h * 0.45, 170)) }; }
+    }, onScan, function () {}).catch(function () {
+      scanMsg('카메라를 켤 수 없어요. 브라우저에서 카메라 권한을 허용한 뒤 다시 시도해 주세요.', 'bad');
+    });
+  }
+  function closeScanner() {
+    $('#scan').hidden = true;
+    if (scanner) {
+      var s = scanner; scanner = null;
+      s.stop().catch(function () {}).then(function () { try { s.clear(); } catch (e) {} });
+    }
+    renderList(); updateBar();
+  }
+  function onScan(text) {
+    if (scanBusy) return;
+    var now = Date.now();
+    if (text === lastCode && now - lastAt < 2500) return;
+    lastCode = text; lastAt = now;
+    var it = findByCode(text);
+    if (!it) { beep(false); scanMsg('등록되지 않은 바코드예요: ' + text, 'bad'); return; }
+    beep(true);
+    if (mode === 'stock') { $('#q').value = it.id; closeScanner(); return; }
+    scanBusy = true; scanItem = it;
+    $('#scName').textContent = it.name;
+    $('#scMeta').innerHTML = esc(it.spec) + (it.spec ? ' · ' : '') + stockText(it, cart[it.id] || 0);
+    $('#scQty').value = 1; scanNow();
+    $('#scanCard').hidden = false; scanMsg('');
+  }
+  function scanNow() {
+    var it = scanItem, have = cart[it.id] || 0, q = Math.max(1, parseInt($('#scQty').value, 10) || 1);
+    var a = avail(it), over = mode === 'out' && a !== '' && have + q > a;
+    $('#scNow').innerHTML = (have ? '담긴 ' + have + ' → ' : '') + '<b style="color:' + (over ? 'var(--red)' : 'var(--ink)') + '">' + (have + q) + esc(it.unit) + '</b>' +
+      (over ? '<br><span style="color:var(--red)">재고 부족</span>' : '');
+  }
+  $('#scQty').addEventListener('input', scanNow);
+  $('#scan').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-sact]'); if (!b) return;
+    var a = b.dataset.sact, q = parseInt($('#scQty').value, 10) || 1;
+    if (a === 'close') closeScanner();
+    else if (a === 'minus') { $('#scQty').value = Math.max(1, q - 1); scanNow(); }
+    else if (a === 'plus') { $('#scQty').value = q + 1; scanNow(); }
+    else if (a === 'skip') { $('#scanCard').hidden = true; scanBusy = false; scanMsg('바코드를 네모 칸 안에 맞춰 주세요'); }
+    else if (a === 'add') {
+      q = Math.max(1, q);
+      setQty(scanItem.id, (cart[scanItem.id] || 0) + q);
+      scanAdded++;
+      scanMsg(scanItem.name + ' ' + q + scanItem.unit + ' 담았어요. 다음 바코드를 찍어 주세요', 'good');
+      $('#scanCard').hidden = true; scanBusy = false; lastAt = Date.now(); scanFoot();
+    }
+  });
+  $('#scanBtn').addEventListener('click', openScanner);
+  document.addEventListener('visibilitychange', function () { if (document.hidden && scanner) closeScanner(); });
 
   setInterval(function () { if (mode === 'stock' && !document.hidden) load(); }, 30000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden && mode === 'stock') load(); });
