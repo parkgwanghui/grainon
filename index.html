@@ -50,6 +50,12 @@
   .scan-top button{border:0;border-radius:10px;background:#fff;color:#0E1411;font-weight:700;font-size:15px;padding:9px 16px;cursor:pointer}
   #reader{width:100%;max-width:520px;margin:0 auto;border-radius:14px;overflow:hidden;background:#000;min-height:220px}
   #reader video{width:100% !important;height:auto !important;display:block}
+  .scan-ctl{display:flex;align-items:center;gap:8px;max-width:520px;width:100%;margin:10px auto 0;flex-wrap:wrap}
+  .scan-ctl button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:600;cursor:pointer}
+  .scan-ctl button.on{background:#fff;color:#0E1411}
+  .scan-ctl button[hidden],.scan-ctl label[hidden]{display:none}
+  .scan-ctl label{flex:1;display:flex;align-items:center;gap:8px;font-size:13px;min-width:150px}
+  .scan-ctl input[type=range]{flex:1;accent-color:#9BE3B8}
   .scan-msg{text-align:center;font-size:14.5px;margin:12px 0;min-height:22px;line-height:1.5}
   .scan-msg.bad{color:#FFB199}.scan-msg.good{color:#9BE3B8}
   .scan-card{background:#fff;color:var(--ink);border-radius:14px;padding:14px;max-width:520px;width:100%;margin:0 auto}
@@ -211,6 +217,11 @@
 <div class="scan" id="scan" hidden>
   <div class="scan-top"><b>바코드 스캔</b><span id="scanInfo"></span><button type="button" data-sact="close">완료</button></div>
   <div id="reader"></div>
+  <div class="scan-ctl">
+    <button type="button" data-sact="switch" id="camSwitch" hidden>카메라 전환</button>
+    <button type="button" data-sact="torch" id="camTorch" hidden>플래시</button>
+    <label id="zoomWrap" hidden>확대 <input type="range" id="camZoom"></label>
+  </div>
   <div class="scan-msg" id="scanMsg">바코드를 네모 칸 안에 맞춰 주세요</div>
   <div class="scan-card" id="scanCard" hidden>
     <div class="name" id="scName"></div>
@@ -598,20 +609,72 @@
     scanBusy = false; scanItem = null; scanAdded = 0; lastCode = '';
     $('#scan').hidden = false; $('#scanCard').hidden = true;
     $('#scanInfo').textContent = mode === 'stock' ? '재고 확인' : place + ' · ' + word();
-    scanMsg('바코드를 네모 칸 안에 맞춰 주세요'); scanFoot();
+    scanMsg('10~20cm 떨어져서 바코드를 네모 칸에 맞춰 주세요'); scanFoot();
+    startCam();
+  }
+
+  var cams = [], torchOn = false;
+  function camKey() { return store('smp_cam') || ''; }
+  function startCam() {
     var F = Html5QrcodeSupportedFormats;
     scanner = new Html5Qrcode('reader', {
       verbose: false,
       formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE],
       experimentalFeatures: { useBarCodeDetectorIfSupported: true }
     });
-    scanner.start({ facingMode: 'environment' }, {
-      fps: 10,
-      qrbox: function (w, h) { return { width: Math.floor(Math.min(w * 0.85, 360)), height: Math.floor(Math.min(h * 0.45, 170)) }; }
-    }, onScan, function () {}).catch(function () {
+    var id = camKey();
+    // 고해상도 + 연속 자동초점 요청 (기본값은 저화질이라 흐릿하게 보임)
+    var vc = { width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] };
+    if (id) vc.deviceId = { exact: id }; else vc.facingMode = 'environment';
+    scanner.start(id ? { deviceId: { exact: id } } : { facingMode: 'environment' }, {
+      fps: 15,
+      disableFlip: true,
+      videoConstraints: vc,
+      qrbox: function (w, h) { return { width: Math.floor(w * 0.9), height: Math.floor(Math.min(h * 0.55, 220)) }; }
+    }, onScan, function () {}).then(afterStart).catch(function () {
+      if (id) { store('smp_cam', ''); scanner = null; startCam(); return; }   // 저장된 카메라가 안 되면 기본 카메라로
       scanMsg('카메라를 켤 수 없어요. 브라우저에서 카메라 권한을 허용한 뒤 다시 시도해 주세요.', 'bad');
     });
   }
+  function afterStart() {
+    var caps = {};
+    try { caps = scanner.getRunningTrackCapabilities() || {}; } catch (e) {}
+    // 확대: 가까이 대면 초점이 안 맞는 폰이 많아서, 약간 떨어져서 확대해 찍는 게 잘 잡혀요
+    if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+      var z = $('#camZoom'), saved = parseFloat(store('smp_zoom'));
+      z.min = caps.zoom.min; z.max = Math.min(caps.zoom.max, 5); z.step = caps.zoom.step || 0.1;
+      z.value = saved >= caps.zoom.min && saved <= z.max ? saved : Math.min(2, z.max);
+      $('#zoomWrap').hidden = false; applyZoom();
+    } else $('#zoomWrap').hidden = true;
+    torchOn = false; $('#camTorch').classList.remove('on');
+    $('#camTorch').hidden = !caps.torch;
+    Html5Qrcode.getCameras().then(function (list) {
+      cams = (list || []).filter(function (c) { return !/front|전면|user/i.test(c.label); });
+      if (cams.length < 2) cams = list || [];
+      $('#camSwitch').hidden = cams.length < 2;
+    }).catch(function () {});
+  }
+  function applyZoom() {
+    var v = parseFloat($('#camZoom').value); store('smp_zoom', String(v));
+    try { scanner.applyVideoConstraints({ advanced: [{ zoom: v }] }).catch(function () {}); } catch (e) {}
+  }
+  $('#camZoom').addEventListener('input', applyZoom);
+  function switchCam() {
+    if (cams.length < 2 || !scanner) return;
+    var cur = camKey(), i = -1;
+    cams.forEach(function (c, k) { if (c.id === cur) i = k; });
+    var next = cams[(i + 1) % cams.length];
+    store('smp_cam', next.id);
+    var s = scanner; scanner = null;
+    s.stop().catch(function () {}).then(function () { try { s.clear(); } catch (e) {} startCam(); });
+    scanMsg('카메라를 바꾸는 중… (' + (next.label || '카메라 ' + ((i + 1) % cams.length + 1)) + ')');
+  }
+  function toggleTorch() {
+    if (!scanner) return;
+    torchOn = !torchOn; $('#camTorch').classList.toggle('on', torchOn);
+    try { scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(function () {}); } catch (e) {}
+  }
+
   function closeScanner() {
     $('#scan').hidden = true;
     if (scanner) {
@@ -646,6 +709,8 @@
     var b = e.target.closest('[data-sact]'); if (!b) return;
     var a = b.dataset.sact, q = parseInt($('#scQty').value, 10) || 1;
     if (a === 'close') closeScanner();
+    else if (a === 'switch') switchCam();
+    else if (a === 'torch') toggleTorch();
     else if (a === 'minus') { $('#scQty').value = Math.max(1, q - 1); scanNow(); }
     else if (a === 'plus') { $('#scQty').value = q + 1; scanNow(); }
     else if (a === 'skip') { $('#scanCard').hidden = true; scanBusy = false; scanMsg('바코드를 네모 칸 안에 맞춰 주세요'); }
