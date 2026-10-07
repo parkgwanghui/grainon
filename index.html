@@ -426,10 +426,12 @@
       return '<button type="button" data-hp="' + esc(p) + '">' + esc(p) + (p === place ? '<small>최근 선택</small>' : '') + '</button>';
     }).join('');
   }
-  function showHome() { renderPlaces(); $('#home').hidden = false; }
+  function showHomeRaw() { renderPlaces(); $('#home').hidden = false; }
+  function showHome() { if (topLayer() === 'list') history.back(); else showHomeRaw(); }
   $('#home').addEventListener('click', function (e) {
     var b = e.target.closest('[data-hp]'); if (!b) return;
     setPlace(b.dataset.hp); $('#home').hidden = true; window.scrollTo(0, 0);
+    pushLayer('list');
   });
   function setPlace(p) {
     if (PLACES.indexOf(p) < 0) return;
@@ -441,8 +443,10 @@
   function showView(v) {
     $('#formView').hidden = v !== 'form'; $('#doneView').hidden = v !== 'done'; $('#recentView').hidden = v !== 'recent';
     $('#overlay').classList.add('show'); $('#sheet').classList.add('show'); $('#sheet').scrollTop = 0;
+    pushLayer('sheet');
   }
-  function closeSheet() { $('#overlay').classList.remove('show'); $('#sheet').classList.remove('show'); }
+  function closeSheetRaw() { $('#overlay').classList.remove('show'); $('#sheet').classList.remove('show'); }
+  function closeSheet() { if (topLayer() === 'sheet') history.back(); else closeSheetRaw(); }
   function renderCart() {
     $('#cartBox').innerHTML = Object.keys(cart).map(function (id) {
       var it = byId(id);
@@ -635,6 +639,7 @@
     $('#scan').hidden = false; $('#scanCard').hidden = true;
     $('#scanInfo').textContent = mode === 'stock' ? '재고 확인' : place + ' · ' + word();
     scanMsg('10~20cm 떨어져서 바코드를 네모 칸에 맞춰 주세요'); scanFoot();
+    pushLayer('scan');
     startCam();
   }
 
@@ -700,7 +705,8 @@
     try { scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(function () {}); } catch (e) {}
   }
 
-  function closeScanner() {
+  function closeScanner() { if (topLayer() === 'scan') history.back(); else closeScannerRaw(); }
+  function closeScannerRaw() {
     $('#scan').hidden = true;
     if (scanner) {
       var s = scanner; scanner = null;
@@ -752,6 +758,50 @@
 
   setInterval(function () { if (mode === 'stock' && !document.hidden) load(); }, 30000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden && mode === 'stock') load(); });
+
+  /* ---------- 뒤로가기: 브라우저를 나가지 않고 이전 화면으로 ----------
+     화면 단계: 첫 화면(home) → 목록(list) → 등록창(sheet) / 바코드 스캔(scan)
+     첫 화면에서 뒤로가기를 누르면 나갈지 물어봄 */
+  var layers = ['home'], histDepth = 0;
+  function topLayer() { return layers[layers.length - 1]; }
+  function ensureGuard() {
+    if (histDepth > 0) return;
+    history.replaceState({ d: 0 }, '');
+    history.pushState({ d: 1 }, '');
+    histDepth = 1;
+  }
+  function pushLayer(n) {
+    if (topLayer() === n) return;
+    ensureGuard();
+    layers.push(n);
+    history.pushState({ d: layers.length }, '');
+    histDepth = layers.length;
+  }
+  function closeLayerRaw(n) {
+    if (n === 'scan') closeScannerRaw();
+    else if (n === 'sheet') closeSheetRaw();
+    else if (n === 'list') showHomeRaw();
+  }
+  window.addEventListener('popstate', function (e) {
+    var d = e.state && typeof e.state.d === 'number' ? e.state.d : 0;
+    var wasHome = layers.length === 1;
+    while (layers.length > Math.max(d, 1)) closeLayerRaw(layers.pop());
+    histDepth = d;
+    if (d >= 1) return;
+    if (!wasHome) {
+      // 중간 단계를 건너뛰고 맨 처음까지 온 경우 → 첫 화면만 보여 주고 나가지 않음
+      history.pushState({ d: 1 }, ''); histDepth = 1;
+      return;
+    }
+    if (confirm('샘플 관리 화면을 나갈까요?')) {
+      history.back();
+      setTimeout(function () { toast('뒤로가기를 한 번 더 누르면 나가집니다.'); }, 400);
+    } else {
+      history.pushState({ d: 1 }, ''); histDepth = 1;
+    }
+  });
+  // 첫 화면에서 아무 곳이나 처음 누를 때 '나가기 확인'용 단계를 만들어 둠
+  document.addEventListener('pointerdown', ensureGuard, true);
 
   renderPlaces(); renderSub(); updateBar(); load();
 </script>
