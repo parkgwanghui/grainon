@@ -140,6 +140,15 @@
   .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-size:14px;color:var(--ink);cursor:pointer}
   .chip.on{background:var(--main);border-color:var(--main);color:#fff}
   .chips.big .chip{flex:1;border-radius:10px;padding:12px;font-size:15px;font-weight:600}
+  .amt{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:-4px 0 14px}
+  .amt .row1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .amt .lbl{font-size:13px;color:var(--sub)}
+  .amt .won{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+  .appr{display:inline-block;border-radius:8px;padding:4px 10px;font-size:13.5px;font-weight:700;margin-top:8px}
+  .appr.a0{background:#E3F1E8;color:#1E4D38}.appr.a1{background:#FFF1CC;color:#7A5300}
+  .appr.a2{background:#FFE1CC;color:#8A3A00}.appr.a3{background:#FBD5D5;color:#8E1B1B}
+  .amt .note{font-size:12.5px;color:var(--sub);margin-top:6px;line-height:1.5}
+  .crow .lp{display:block;font-size:12px;color:var(--sub)}
   .err{color:var(--red);font-size:13.5px;min-height:18px;margin:4px 0}
 
   .done{text-align:center;padding:20px 4px 4px}
@@ -200,6 +209,7 @@
     <div class="sheet-head"><h2 id="sheetTitle">출고 등록</h2><div><button class="x" data-act="clearAll" style="color:var(--red)">전체 비우기</button><button class="x" data-act="close">닫기</button></div></div>
     <div id="editBanner"></div>
     <div class="box" id="cartBox"></div>
+    <div class="amt" id="amtBox"></div>
     <div class="two">
       <div class="field"><label for="user">담당자<span class="req">*</span></label><input id="user" autocomplete="name"></div>
       <div class="field"><label for="dept">부서<span class="req">*</span></label><input id="dept"></div>
@@ -283,6 +293,15 @@
     });
   }
   function byId(id) { for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].id === id) return ITEMS[i]; }
+  var APPROVAL = [{ under: 300000, label: '팀장 전결' }, { under: 700000, label: '총괄/실장 전결' },
+                  { under: 5000000, label: 'CFO 전결' }, { under: null, label: 'CEO' }];
+  function won(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
+  function approvalIdx(a) { for (var i = 0; i < APPROVAL.length; i++) if (APPROVAL[i].under === null || a < APPROVAL[i].under) return i; return APPROVAL.length - 1; }
+  function cartAmount() {
+    var amt = 0, noPrice = 0;
+    Object.keys(cart).forEach(function (id) { var it = byId(id); if (!it) return; if (it.price === '' || it.price == null) noPrice++; else amt += it.price * cart[id]; });
+    return { amt: amt, noPrice: noPrice };
+  }
   function word() { return mode === 'in' ? '입고' : '출고'; }
   function pad(n) { return ('0' + n).slice(-2); }
   function hhmm(d, sec) { return pad(d.getHours()) + ':' + pad(d.getMinutes()) + (sec ? ':' + pad(d.getSeconds()) : ''); }
@@ -317,6 +336,7 @@
     return apiInit().then(function (d) {
       ITEMS = d.items.sort(function (a, b) { return a.name.localeCompare(b.name, 'ko', { numeric: true }); }); PURPOSES = d.purposes; IN_PURPOSES = d.inPurposes || []; PLACES = d.places || PLACES;
       if (d.editLimitMin) LIMIT_MIN = d.editLimitMin;
+      if (d.approval && d.approval.length) APPROVAL = d.approval;
       lastLoaded = new Date();
       renderSub(); renderList(); renderChips();
     }).catch(function (e) {
@@ -373,7 +393,8 @@
       var qty = cart[it.id] || 0;
       return '<div class="item' + (qty ? ' on' : '') + '" data-id="' + esc(it.id) + '">' +
         '<div class="info"><div class="name">' + esc(it.name) + '</div>' +
-        '<div class="meta">' + esc(it.spec) + (it.spec ? ' · ' : '') + '<span class="st">' + stockText(it, qty) + '</span></div></div>' +
+        '<div class="meta">' + esc(it.spec) + (it.spec ? ' · ' : '') + (it.price !== '' && it.price != null ? won(it.price) + ' · ' : '') +
+        '<span class="st">' + stockText(it, qty) + '</span></div></div>' +
         '<div class="step"><button type="button" data-d="-1" aria-label="빼기">−</button>' +
         '<input type="number" inputmode="numeric" min="0" value="' + (qty || '') + '" placeholder="0" aria-label="수량">' +
         '<button type="button" data-d="1" aria-label="더하기">+</button></div></div>';
@@ -396,10 +417,26 @@
     ids.forEach(function (id) { total += cart[id]; });
     var pre = editing ? '수정 중 · ' : '';
     $('#sum').innerHTML = ids.length
-      ? '<b>' + pre + ids.length + '개 품목 · 총 ' + total + '개</b>담은 목록에서 등록하세요'
+      ? '<b>' + pre + ids.length + '개 품목 · 총 ' + total + '개</b>' + barAmount()
       : '<b>' + (editing ? '수정 중 · ' : '') + '담긴 샘플 없음</b>수량을 눌러 담아 주세요';
     $('#openCart').disabled = !ids.length;
     $('#clearCart').hidden = !ids.length;
+  }
+  function barAmount() {
+    var c = cartAmount();
+    var s = '<span style="color:var(--ink);font-weight:700">' + won(c.amt) + '</span>';
+    if (mode === 'out') s += ' · ' + esc(APPROVAL[approvalIdx(c.amt)].label);
+    return s;
+  }
+  function renderAmount() {
+    var c = cartAmount(), i = approvalIdx(c.amt);
+    var html = '<div class="row1"><span class="lbl">합계 금액 (판매가 기준)</span><span class="won">' + won(c.amt) + '</span></div>';
+    if (mode === 'out') {
+      html += '<span class="appr a' + Math.min(i, 3) + '">' + esc(APPROVAL[i].label) + '</span>' +
+        '<div class="note">전결규정에 따라 결재를 진행한 뒤 신청해 주세요.</div>';
+    }
+    if (c.noPrice) html += '<div class="note" style="color:var(--red)">판매가가 입력되지 않은 ' + c.noPrice + '개 품목은 합계에서 빠졌어요.</div>';
+    $('#amtBox').innerHTML = html;
   }
   function clearCart() {
     var n = Object.keys(cart).length; if (!n) return false;
@@ -450,9 +487,11 @@
   function renderCart() {
     $('#cartBox').innerHTML = Object.keys(cart).map(function (id) {
       var it = byId(id);
-      return '<div class="crow"><span class="n">' + esc(it.name) + (it.spec ? ' <small style="color:var(--sub)">' + esc(it.spec) + '</small>' : '') +
+      var lp = it.price !== '' && it.price != null ? '<span class="lp">' + won(it.price) + ' × ' + cart[id] + ' = ' + won(it.price * cart[id]) + '</span>' : '<span class="lp">판매가 미입력</span>';
+      return '<div class="crow"><span class="n">' + esc(it.name) + (it.spec ? ' <small style="color:var(--sub)">' + esc(it.spec) + '</small>' : '') + lp +
         '</span><span class="q">' + cart[id] + esc(it.unit) + '</span><button class="rm" data-rm="' + esc(id) + '">빼기</button></div>';
     }).join('');
+    renderAmount();
     $('#editBanner').innerHTML = editing
       ? '<div class="banner">요청번호 <b>' + esc(editing.reqNo) + '</b> 수정 중이에요. 등록하면 기존 내역은 자동으로 취소 처리돼요.' +
         '<button type="button" data-act="stopEdit">수정 그만두기</button></div>' : '';
@@ -470,7 +509,7 @@
     $('#submit').textContent = editing ? '수정 내용 등록' : w + ' 등록';
     $('#purposeLabel').innerHTML = (m === 'in' ? '입고 구분' : '사용 구분') + '<span class="req">*</span>';
     $('#clientLabel').innerHTML = m === 'in' ? '입고처 <small>공급처·반납자 등</small>' : '제공처 <small>고객사·행사명 등</small>';
-    renderSub(); renderChips(); renderList();
+    renderSub(); renderChips(); renderList(); updateBar();
     if (m === 'stock') load();
   }
 
@@ -589,7 +628,9 @@
       if (wasEdit) removeRecent(wasEdit.reqNo);
       addRecent(rec); lastDone = rec; editing = null;
       $('#doneTitle').textContent = wasEdit ? '수정됐어요' : word() + '가 등록됐어요';
-      $('#doneText').innerHTML = esc(place) + ' · ' + esc(r.count) + '개 품목, 총 ' + esc(r.total) + '개<br>요청번호 ' + esc(r.reqNo);
+      $('#doneText').innerHTML = esc(place) + ' · ' + esc(r.count) + '개 품목, 총 ' + esc(r.total) + '개' +
+        (r.amount != null ? '<br>판매가 합계 ' + won(r.amount) + (r.approval ? ' · ' + esc(r.approval) : '') : '') +
+        '<br>요청번호 ' + esc(r.reqNo);
       $('#doneHint').textContent = '잘못 등록했다면 ' + dur(LIMIT_MIN) + ' 안에 수정하거나 취소할 수 있어요.';
       cart = {}; purpose = ''; $('#client').value = ''; $('#memo').value = '';
       setMode(mode); updateBar(); showView('done'); load();
