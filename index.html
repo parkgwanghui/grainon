@@ -295,6 +295,8 @@
   function byId(id) { for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].id === id) return ITEMS[i]; }
   var APPROVAL = [{ under: 300000, label: '팀장 전결' }, { under: 700000, label: '총괄/실장 전결' },
                   { under: 5000000, label: 'CFO 전결' }, { under: null, label: 'CEO' }];
+  var DRAFT_MIN = 300000;
+  function needDraft(amt) { return mode === 'out' && amt >= DRAFT_MIN; }
   function won(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
   function approvalIdx(a) { for (var i = 0; i < APPROVAL.length; i++) if (APPROVAL[i].under === null || a < APPROVAL[i].under) return i; return APPROVAL.length - 1; }
   function cartAmount() {
@@ -337,6 +339,7 @@
       ITEMS = d.items.sort(function (a, b) { return a.name.localeCompare(b.name, 'ko', { numeric: true }); }); PURPOSES = d.purposes; IN_PURPOSES = d.inPurposes || []; PLACES = d.places || PLACES;
       if (d.editLimitMin) LIMIT_MIN = d.editLimitMin;
       if (d.approval && d.approval.length) APPROVAL = d.approval;
+      if (d.draftMin) DRAFT_MIN = d.draftMin;
       lastLoaded = new Date();
       renderSub(); renderList(); renderChips();
     }).catch(function (e) {
@@ -425,7 +428,7 @@
   function barAmount() {
     var c = cartAmount();
     var s = '<span style="color:var(--ink);font-weight:700">' + won(c.amt) + '</span>';
-    if (mode === 'out') s += ' · ' + esc(APPROVAL[approvalIdx(c.amt)].label);
+    if (mode === 'out') s += ' · ' + esc(APPROVAL[approvalIdx(c.amt)].label) + (needDraft(c.amt) ? ' · <span style="color:var(--red);font-weight:700">기안 필요</span>' : '');
     return s;
   }
   function renderAmount() {
@@ -433,7 +436,9 @@
     var html = '<div class="row1"><span class="lbl">합계 금액 (판매가 기준)</span><span class="won">' + won(c.amt) + '</span></div>';
     if (mode === 'out') {
       html += '<span class="appr a' + Math.min(i, 3) + '">' + esc(APPROVAL[i].label) + '</span>' +
-        '<div class="note">전결규정에 따라 결재를 진행한 뒤 신청해 주세요.</div>';
+        (needDraft(c.amt)
+          ? '<div class="note" style="color:var(--ink)"><b>' + won(DRAFT_MIN) + ' 이상은 별도 기안 승인 후 신청</b>해야 해요. 기안 승인을 받으셨는지 확인해 주세요.</div>'
+          : '<div class="note">' + won(DRAFT_MIN) + ' 미만이라 샘플신청서로 진행돼요.</div>');
     }
     if (c.noPrice) html += '<div class="note" style="color:var(--red)">판매가가 입력되지 않은 ' + c.noPrice + '개 품목은 합계에서 빠졌어요.</div>';
     $('#amtBox').innerHTML = html;
