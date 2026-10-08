@@ -249,6 +249,7 @@
   <div class="scan-ctl">
     <button type="button" data-sact="switch" id="camSwitch" hidden>카메라 전환</button>
     <button type="button" data-sact="torch" id="camTorch" hidden>플래시</button>
+    <button type="button" data-sact="ext" id="openExt" hidden>외부 브라우저로 열기</button>
     <label id="zoomWrap" hidden>확대 <input type="range" id="camZoom"></label>
   </div>
   <div class="scan-msg" id="scanMsg">바코드를 네모 칸 안에 맞춰 주세요</div>
@@ -682,7 +683,7 @@
     if (mode !== 'stock' && !place) { toast('먼저 위에서 장소(본관/별관)를 선택하세요.'); return; }
     if (typeof Html5Qrcode === 'undefined') { toast('스캔 기능을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.'); return; }
     scanBusy = false; scanItem = null; scanAdded = 0; lastCode = '';
-    $('#scan').hidden = false; $('#scanCard').hidden = true;
+    $('#scan').hidden = false; $('#scanCard').hidden = true; $('#openExt').hidden = true;
     $('#scanInfo').textContent = mode === 'stock' ? '재고 확인' : place + ' · ' + word();
     scanMsg('10~20cm 떨어져서 바코드를 네모 칸에 맞춰 주세요'); scanFoot();
     pushLayer('scan');
@@ -691,30 +692,83 @@
 
   var cams = [], torchOn = false;
   function camKey() { return store('smp_cam') || ''; }
-  function startCam() {
+  var UA = navigator.userAgent || '';
+  var IS_IOS = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var IN_APP = /KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(UA);
+  var camGen = 0;
+
+  // simple = 기본 설정으로만 켜기 (아이폰, 또는 고화질 설정에서 화면이 안 나올 때)
+  function startCam(simple) {
     var F = Html5QrcodeSupportedFormats;
+    var gen = ++camGen;
     scanner = new Html5Qrcode('reader', {
       verbose: false,
       formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE],
       experimentalFeatures: { useBarCodeDetectorIfSupported: true }
     });
     var id = camKey();
-    // 고해상도 + 연속 자동초점 요청 (기본값은 저화질이라 흐릿하게 보임)
-    var vc = { width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] };
-    if (id) vc.deviceId = { exact: id }; else vc.facingMode = 'environment';
-    scanner.start(id ? { deviceId: { exact: id } } : { facingMode: 'environment' }, {
+    var cfg = {
       fps: 15,
       disableFlip: true,
-      videoConstraints: vc,
       qrbox: function (w, h) { return { width: Math.floor(w * 0.9), height: Math.floor(Math.min(h * 0.55, 220)) }; }
-    }, onScan, function () {}).then(afterStart).catch(function () {
-      if (id) { store('smp_cam', ''); scanner = null; startCam(); return; }   // 저장된 카메라가 안 되면 기본 카메라로
-      scanMsg('카메라를 켤 수 없어요. 브라우저에서 카메라 권한을 허용한 뒤 다시 시도해 주세요.', 'bad');
-    });
+    };
+    if (!simple && !IS_IOS) {
+      // 안드로이드: 고해상도 + 연속 자동초점 요청 (기본값은 저화질이라 흐릿하게 보임)
+      var vc = { width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] };
+      if (id) vc.deviceId = { exact: id }; else vc.facingMode = 'environment';
+      cfg.videoConstraints = vc;
+    }
+    scanner.start(id || { facingMode: 'environment' }, cfg, onScan, function () {})
+      .then(function () { afterStart(simple); watchVideo(gen, simple); })
+      .catch(function () {
+        if (gen !== camGen) return;
+        scanner = null;
+        if (id) { store('smp_cam', ''); startCam(simple); return; }   // 저장된 카메라가 안 되면 기본 카메라로
+        if (!simple) { startCam(true); return; }                     // 고화질 설정이 안 되면 기본 설정으로
+        camHelp();
+      });
   }
-  function afterStart() {
+  // 화면이 검게 나오는지 확인하고, 그러면 다시 켜 봄
+  function watchVideo(gen, simple) {
+    setTimeout(function () {
+      if (gen !== camGen || !scanner) return;
+      var v = document.querySelector('#reader video');
+      if (v && v.videoWidth > 0 && !v.paused) return;
+      if (v) { v.setAttribute('playsinline', ''); v.setAttribute('autoplay', ''); v.muted = true; try { v.play().catch(function () {}); } catch (e) {} }
+      setTimeout(function () {
+        if (gen !== camGen || !scanner) return;
+        var v2 = document.querySelector('#reader video');
+        if (v2 && v2.videoWidth > 0) return;
+        if (!simple) { restartCam(true); return; }
+        camHelp();
+      }, 1500);
+    }, 2500);
+  }
+  function restartCam(simple) {
+    var s = scanner; scanner = null; camGen++;
+    if (!s) { startCam(simple); return; }
+    s.stop().catch(function () {}).then(function () { try { s.clear(); } catch (e) {} startCam(simple); });
+  }
+  function openExternal() {
+    var url = location.href.split('#')[0];
+    if (/KAKAOTALK/i.test(UA)) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+    else if (!IS_IOS) location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+    else { try { navigator.clipboard.writeText(url); } catch (e) {} toast('주소를 복사했어요. 사파리를 열고 붙여넣어 주세요.'); }
+  }
+  function camHelp() {
+    if (IN_APP) {
+      scanMsg('카카오톡·네이버 등 앱 안에서 연 화면에서는 카메라가 안 될 수 있어요. 아래 버튼으로 ' + (IS_IOS ? '사파리' : '크롬') + '에서 열어 주세요.', 'bad');
+      $('#openExt').hidden = false;
+    } else {
+      scanMsg(IS_IOS
+        ? '카메라 화면이 안 나오면: 설정 → Safari → 카메라 → "허용"으로 바꾼 뒤 새로고침해 주세요.'
+        : '카메라를 켤 수 없어요. 브라우저에서 카메라 권한을 허용한 뒤 새로고침해 주세요.', 'bad');
+    }
+  }
+  function afterStart(simple) {
     var caps = {};
-    try { caps = scanner.getRunningTrackCapabilities() || {}; } catch (e) {}
+    // 아이폰은 확대·플래시 설정을 건드리면 화면이 멈추는 경우가 있어 사용하지 않음
+    if (!IS_IOS && !simple) { try { caps = scanner.getRunningTrackCapabilities() || {}; } catch (e) {} }
     // 확대: 가까이 대면 초점이 안 맞는 폰이 많아서, 약간 떨어져서 확대해 찍는 게 잘 잡혀요
     if (caps.zoom && caps.zoom.max > caps.zoom.min) {
       var z = $('#camZoom'), saved = parseFloat(store('smp_zoom'));
@@ -742,6 +796,7 @@
     var next = cams[(i + 1) % cams.length];
     store('smp_cam', next.id);
     var s = scanner; scanner = null;
+    camGen++;
     s.stop().catch(function () {}).then(function () { try { s.clear(); } catch (e) {} startCam(); });
     scanMsg('카메라를 바꾸는 중… (' + (next.label || '카메라 ' + ((i + 1) % cams.length + 1)) + ')');
   }
@@ -753,7 +808,7 @@
 
   function closeScanner() { if (topLayer() === 'scan') history.back(); else closeScannerRaw(); }
   function closeScannerRaw() {
-    $('#scan').hidden = true;
+    $('#scan').hidden = true; camGen++;
     if (scanner) {
       var s = scanner; scanner = null;
       s.stop().catch(function () {}).then(function () { try { s.clear(); } catch (e) {} });
@@ -787,6 +842,7 @@
     var a = b.dataset.sact, q = parseInt($('#scQty').value, 10) || 1;
     if (a === 'close') closeScanner();
     else if (a === 'switch') switchCam();
+    else if (a === 'ext') openExternal();
     else if (a === 'torch') toggleTorch();
     else if (a === 'minus') { $('#scQty').value = Math.max(1, q - 1); scanNow(); }
     else if (a === 'plus') { $('#scQty').value = q + 1; scanNow(); }
