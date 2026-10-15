@@ -360,7 +360,7 @@
   }
   function renderList() {
     var q = $('#q').value.trim().toLowerCase();
-    var list = ITEMS.filter(function (it) { return !q || (it.name + ' ' + it.id + ' ' + it.spec + ' ' + (it.codes || []).join(' ')).toLowerCase().indexOf(q) > -1; });
+    var list = ITEMS.filter(function (it) { return !q || (it.name + ' ' + it.id + ' ' + (it.codes || []).join(' ')).toLowerCase().indexOf(q) > -1; });
     if (!ITEMS.length) { $('#list').innerHTML = '<div class="msg">등록된 샘플이 없습니다.<br>시트의 샘플목록 탭에 품목을 추가하세요.</div>'; return; }
     if (!list.length) { $('#list').innerHTML = '<div class="msg">‘' + esc(q) + '’와 일치하는 샘플이 없습니다.</div>'; return; }
     if (mode === 'stock') {
@@ -371,7 +371,7 @@
             : '<div class="' + (s <= 0 ? 'zero' : '') + '"><span class="pl">' + esc(p) + '</span><b>' + esc(s) + '</b><small>' + esc(it.unit) + '</small></div>';
         }).join('') + '</div>';
         return '<div class="item"><div class="info"><div class="name">' + esc(it.name) + '</div><div class="meta">' +
-          esc(it.spec) + (it.spec ? ' · ' : '') + esc(it.id) + '</div></div>' + sq + '</div>';
+          esc(it.id) + '</div></div>' + sq + '</div>';
       }).join('');
       return;
     }
@@ -379,7 +379,7 @@
       var qty = cart[it.id] || 0;
       return '<div class="item' + (qty ? ' on' : '') + '" data-id="' + esc(it.id) + '">' +
         '<div class="info"><div class="name">' + esc(it.name) + '</div>' +
-        '<div class="meta">' + esc(it.spec) + (it.spec ? ' · ' : '')+
+        '<div class="meta">' +
         '<span class="st">' + stockText(it, qty) + '</span></div></div>' +
         '<div class="step"><button type="button" data-d="-1" aria-label="빼기">−</button>' +
         '<input type="number" inputmode="numeric" min="0" value="' + (qty || '') + '" placeholder="0" aria-label="수량">' +
@@ -466,7 +466,7 @@
   function renderCart() {
     $('#cartBox').innerHTML = Object.keys(cart).map(function (id) {
       var it = byId(id);
-      return '<div class="crow"><span class="n">' + esc(it.name) + (it.spec ? ' <small style="color:var(--sub)">' + esc(it.spec) + '</small>' : '') +
+      return '<div class="crow"><span class="n">' + esc(it.name) +
         '</span><span class="q">' + cart[id] + esc(it.unit) + '</span><button class="rm" data-rm="' + esc(id) + '">빼기</button></div>';
     }).join('');
     var c = cartAmount();
@@ -799,7 +799,7 @@
     if (mode === 'stock') { $('#q').value = it.id; closeScanner(); return; }
     scanBusy = true; scanItem = it;
     $('#scName').textContent = it.name;
-    $('#scMeta').innerHTML = esc(it.spec) + (it.spec ? ' · ' : '') + stockText(it, cart[it.id] || 0);
+    $('#scMeta').innerHTML = stockText(it, cart[it.id] || 0);
     $('#scQty').value = 1; scanNow();
     $('#scanCard').hidden = false; scanMsg('');
   }
