@@ -403,7 +403,7 @@
     ids.forEach(function (id) { total += cart[id]; });
     var pre = editing ? '수정 중 · ' : '';
     $('#sum').innerHTML = ids.length
-      ? '<b>' + pre + ids.length + '개 품목 · 총 ' + total + '개</b>판매가 합계 ' + won(cartAmount().amt)
+      ? '<b>' + pre + ids.length + '개 품목 · 총 ' + total + '개</b>합계 금액 ' + won(cartAmount().amt)
       : '<b>' + (editing ? '수정 중 · ' : '') + '담긴 샘플 없음</b>수량을 눌러 담아 주세요';
     $('#openCart').disabled = !ids.length;
     $('#clearCart').hidden = !ids.length;
@@ -470,8 +470,8 @@
         '</span><span class="q">' + cart[id] + esc(it.unit) + '</span><button class="rm" data-rm="' + esc(id) + '">빼기</button></div>';
     }).join('');
     var c = cartAmount();
-    $('#amtBox').innerHTML = '<span class="lbl">판매가 합계</span><span class="won">' + won(c.amt) + '</span>' +
-      '<span class="note">※ 온라인 판매가 기준이며 참고용입니다' + (c.noPrice ? ' (판매가 없는 ' + c.noPrice + '개 품목 제외)' : '') + '</span>';
+    $('#amtBox').innerHTML = '<span class="lbl">합계 금액</span><span class="won">' + won(c.amt) + '</span>' +
+      '<span class="note">※ 샘플 기준금액입니다' + (c.noPrice ? ' (금액 없는 ' + c.noPrice + '개 품목 제외)' : '') + '</span>';
     $('#editBanner').innerHTML = editing
       ? '<div class="banner">요청번호 <b>' + esc(editing.reqNo) + '</b> 수정 중이에요. 등록하면 기존 내역은 자동으로 취소 처리돼요.' +
         '<button type="button" data-act="stopEdit">수정 그만두기</button></div>' : '';
