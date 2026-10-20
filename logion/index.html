@@ -124,7 +124,7 @@ async function switchWH(){if(LIVE){$('app').innerHTML='<p class="note" style="pa
 async function boot(){if(user)await switchWH();else loadWH();render()}
 setInterval(async()=>{if(!LIVE||!user||document.hidden)return;flush();try{applySrv(await api({action:'state',wh:WHN()}));
   if(tab==='map'&&!FREE)document.querySelectorAll('#mb .c[data-c]').forEach(b=>{const l=BY[b.dataset.c];if(!l)return;const k=status(l);b.className='c '+(k==='todo'?'s':k)+(l.code===cur?' here':'')});
-  else if(tab==='dash'&&document.activeElement!==$('qt'))(FREE?freeDash:dash)();}catch(e){}},20000);
+  else if(tab==='dash'&&document.activeElement!==$('qt'))(FREE?freeDash:dash)();else if(tab==='rev'&&!FREE&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))rev();}catch(e){}},20000);
 const $=id=>document.getElementById(id),pad=n=>String(n).padStart(2,'0');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const st={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
@@ -143,7 +143,7 @@ let WID=st.get('lg_wh','c1'),LOCS=[],BY={},ZONES=[],NODATA=false,FREE=false;
 const WHN=()=>WHS.find(w=>w.id===WID).name;
 function mkLoc(code,item,exp,qty){const m=code.match(/^([A-Z]\d\d)-(\d\d)-(\d\d)-(\d\d)$/);return {code,zone:code.slice(0,3),rack:m?+m[2]:0,level:m?+m[3]:0,bin:m?+m[4]:0,reg:!!m,item,exp,qty}}
 function loadWH(){
-  FREE=WID==='rt';LOCS=[];const SRC=LIVE?(SRV||{items:[],rows:[]}):RAW;if(LIVE)ITEMS=SRC.items||[];
+  FREE=false;LOCS=[];const SRC=LIVE?(SRV||{items:[],rows:[]}):RAW;if(LIVE)ITEMS=SRC.items||[];
   if(SRC.rows&&SRC.rows.length&&(WID==='c1'||LIVE))LOCS=SRC.rows.map(r=>mkLoc(r[0],r[1]?ITEMS[r[1]-1]:'',r[2]||'',r[3]===''?null:r[3]));
   if(WID==='c2'&&!LOCS.length){const add=(z,rk,lv)=>{for(let r=1;r<=rk;r++)for(let v=1;v<=lv;v++)for(let b=1;b<=2;b++)LOCS.push(mkLoc(`${z}-${pad(r)}-${pad(v)}-${pad(b)}`,'','',null))};
     add('C01',20,5);for(let i=2;i<=10;i++)add('C'+pad(i),10,5);for(let i=2;i<=15;i++)add('D'+pad(i),10,5)}
@@ -163,30 +163,32 @@ function record(l,act,after,reason){
   commit({t:now(),user,wh:WHN(),act,loc:l.code,before,after:after||'',reason:reason||''},l.code);
 }
 
+let ORG=st.get('lg_org','그레인온');
 /* ---- 시작 화면 ---- */
 function login(){
   $('app').innerHTML=`<div class="login"><h1>로지온 재고실사</h1><p>QR로 접속하면 이 화면이 열립니다. 담당자 이름을 입력하면 이후 모든 작업이 이 이름으로 기록됩니다.</p>
   <div class="fld"><label>업체명</label><div class="fixed">${COMPANY}</div></div>
   <div class="fld"><label for="lw">창고</label><select class="in" id="lw">${WHS.map(w=>`<option value="${w.id}" ${w.id===WID?'selected':''}>${w.name}</option>`).join('')}</select></div>
   <div class="fld"><label for="nm">실사 담당자</label><input class="in" id="nm" placeholder="이름 입력" value="${esc(st.get('lg_last',''))}"></div>
+  <div class="fld"><label for="og">소속</label><select class="in" id="og">${['그레인온','로지온코리아'].map(o=>`<option ${o===ORG?'selected':''}>${o}</option>`).join('')}</select></div>
   <div class="fld"><label>실사일자</label><div class="fixed num">${today()}</div></div>
   <button class="btn p" style="width:100%" id="go">실사 시작</button></div>`;
   const go=()=>{const v=$('nm').value.trim();if(!v){toast('담당자 이름을 입력하세요');$('nm').focus();return}
-    user=v;WID=$('lw').value;st.set('lg_wh',WID);st.set('lg_user',v);st.set('lg_last',v);switchWH().then(render)};
+    user=v;WID=$('lw').value;st.set('lg_wh',WID);ORG=$('og').value;st.set('lg_org',ORG);st.set('lg_user',v);st.set('lg_last',v);switchWH().then(render)};
   $('go').onclick=go;$('nm').onkeydown=e=>{if(e.key==='Enter')go()};
 }
 
 /* ---- 공통 틀 ---- */
 function render(){
   if(!user)return login();
-  $('app').innerHTML=`<header class="top"><div class="wrap"><div class="in2"><div><b>${COMPANY}</b><select class="whsel" id="whs" aria-label="창고 선택">${WHS.map(w=>`<option value="${w.id}" ${w.id===WID?'selected':''}>${w.name}</option>`).join('')}</select><small>${esc(user)} · ${today()}<span id="sy"></span></small></div><button class="x" id="out">담당자 변경</button></div>
-  <nav class="tabs">${[['dash','대시보드'],['map','배치도'],['count','실사'],['log','작업기록']].map(([k,v])=>`<button class="tab ${tab===k?'on':''}" data-t="${k}">${v}</button>`).join('')}</nav></div></header>
+  $('app').innerHTML=`<header class="top"><div class="wrap"><div class="in2"><div><b>${COMPANY}</b><select class="whsel" id="whs" aria-label="창고 선택">${WHS.map(w=>`<option value="${w.id}" ${w.id===WID?'selected':''}>${w.name}</option>`).join('')}</select><small>${esc(user)}(${esc(ORG)}) · ${today()}<span id="sy"></span></small></div><button class="x" id="out">담당자 변경</button></div>
+  <nav class="tabs">${[['dash','대시보드'],['map','배치도'],['count','실사'],...(FREE?[]:[['rev','차이 소명']]),['log','작업기록']].map(([k,v])=>`<button class="tab ${tab===k?'on':''}" data-t="${k}">${v}</button>`).join('')}</nav></div></header>
   <main class="page wrap" id="pg"></main>`;
   $('out').onclick=()=>{user=null;st.set('lg_user',null);login()};
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
   $('whs').onchange=e=>{WID=e.target.value;st.set('lg_wh',WID);switchWH().then(render)};
   if(!FREE&&!LOCS.length&&tab!=='log'){$('pg').innerHTML='<section class="panel"><p class="note">로케이션재고 시트에 이 창고 데이터가 없습니다.</p></section>';return}
-  if(FREE)({dash:freeDash,map:freeMap,count:freeCount,log})[tab]();else ({dash,map,count,log})[tab]();
+  if(FREE)({dash:freeDash,map:freeMap,count:freeCount,log,rev:freeDash})[tab]();else ({dash,map,count,log,rev})[tab]();
 }
 
 /* ---- 대시보드 ---- */
@@ -201,7 +203,7 @@ function dash(){
     <td><span class="mini"><span class="bar" style="height:8px"><i style="width:${zb?a1/zb*100:0}%;background:${NODATA?'var(--man)':'var(--ok)'}"></i><i style="width:${zb?a2/zb*100:0}%;background:${NODATA?'var(--emptyok)':'var(--bad)'}"></i><i style="width:${zb?k.hold/zb*100:0}%;background:var(--hold)"></i></span></span></td></tr>`}).join('');
   const K=(t,v,i,col)=>`<div class="kpi"><span>${t}</span><b class="num" ${col?`style="color:${col}"`:''}>${v}</b><i>${i}</i></div>`;
   const kp=NODATA?[K('총 로케이션',total.toLocaleString(),'전산 재고 없음 · 수기 기록 창고'),K('확인 진행률',pct+'%','전체 로케이션 기준'),K('수기 등록',c.manual,'실물 있는 로케이션','var(--man)'),K('빈칸 확인',c.okE,'비어 있음 확인'),K('보류',c.hold,'','var(--hold)'),K('미확인',c.empty,'')]
-   :[K('총 로케이션',total.toLocaleString(),`랙 ${LOCS.filter(l=>l.reg).length} · 통로바닥/선반 등 ${LOCS.filter(l=>!l.reg).length}`),K('재고 있는 로케이션',stock.toLocaleString(),`빈 로케이션 ${total-stock}`),K('실사 진행률',pct+'%','재고 로케이션 기준 (보류 포함)'),K('확인완료',c.ok,`빈칸 확인 ${c.okE}`,'var(--ok)'),K('상이(수정)',c.diff,'품목·수량·소비기한 다름','var(--bad)'),K('보류',c.hold,`미실사 ${c.todo}`,'var(--hold)')];
+   :[K('총 로케이션',total.toLocaleString(),`랙 ${LOCS.filter(l=>l.reg).length} · 통로바닥/선반 등 ${LOCS.filter(l=>!l.reg).length}`),K('재고 있는 로케이션',stock.toLocaleString(),`빈 로케이션 ${total-stock}`),K('실사 진행률',pct+'%','재고 로케이션 기준 (보류 포함)'),K('확인완료',c.ok,`빈칸 확인 ${c.okE}`,'var(--ok)'),K('상이(수정)',c.diff,'품목·수량·소비기한 다름','var(--bad)'),K('보류',c.hold,`미실사 ${c.todo}`,'var(--hold)'),(()=>{const d=Object.values(S).filter(x=>x.st==='diff'),n=k=>d.filter(x=>(x.rv?x.rv.st:'wait')===k).length;return K('차이 소명 필요',n('wait')+n('rej'),`확인 대기 ${n('done')} · 확인완료 ${n('ok')}`,'var(--bad)')})()];
   const w=v=>base?v/base*100:0;
   $('pg').innerHTML=`<div class="kpis">${kp.join('')}</div>
   <section class="panel"><h2>전체 진행 <small>${NODATA?`전체 로케이션 ${total}곳 기준`:`재고 있는 로케이션 ${stock}곳 기준`}</small></h2>
@@ -367,6 +369,42 @@ function detail(list){
   $('pv').onclick=()=>{cur=list[i-1].code;form='';count()};$('toMap').onclick=()=>{tab='map';render()};$('nx').onclick=next;
   if($('lot'))$('lot').onclick=()=>{$('lotB').innerHTML=`<b style="font-size:17px">LOT 정보</b><p class="note">지금은 소비기한만 있습니다. LOT 번호가 들어오면 아래 항목이 채워집니다.</p>
     <dl class="dl"><dt>LOT 번호</dt><dd>-</dd><dt>품목</dt><dd>${esc(l.item)}</dd><dt>제조일자</dt><dd>-</dd><dt>소비기한</dt><dd>${fmtExp(l.exp)}</dd><dt>입고일자</dt><dd>-</dd></dl><button class="btn" style="width:100%" onclick="$('lotM').classList.remove('show')">닫기</button>`;$('lotM').classList.add('show')};
+}
+
+
+/* ---- 차이 소명: 로지온 사유 등록 → 그레인온 확인 ---- */
+let rvF='need';
+const RVL={wait:'소명 대기',done:'확인 대기',ok:'사유 확인완료',rej:'반려(재소명)'};
+const rvSt=s=>s.rv?s.rv.st:'wait';
+const CATS=['입출고 전산 미반영','피킹·출고 오류','로케이션 이동 미등록','파손·폐기 미처리','입고 수량 오류','전산 등록 오류','기타'];
+function rev(){
+  const ls=LOCS.filter(l=>S[l.code]&&S[l.code].st==='diff');
+  const grp=k=>k==='need'?['wait','rej']:k==='all'?['wait','rej','done','ok']:[k];
+  const cnt=k=>ls.filter(l=>grp(k).includes(rvSt(S[l.code]))).length;
+  const sh=ls.filter(l=>grp(rvF).includes(rvSt(S[l.code])));
+  const LG=ORG==='로지온코리아';
+  $('pg').innerHTML=`<section class="panel"><h2>차이 소명 <small>상이(수정) 건에 로지온코리아가 사유를 달고, 그레인온이 확인합니다 · 지금 ${esc(ORG)} 소속으로 접속</small></h2>
+   <div class="chips">${[['need','소명 필요'],['done','확인 대기'],['ok','확인완료'],['all','전체']].map(([k,v])=>`<button class="chip ${rvF===k?'on':''}" data-r="${k}">${v} ${cnt(k)}</button>`).join('')}</div></section>
+   ${sh.length?sh.map((l,i)=>{const s=S[l.code],f=s.fix,r=s.rv||{st:'wait'},k=r.st;
+    const canW=LG&&(k==='wait'||k==='rej'||k==='done'),canC=!LG&&k==='done';
+    return `<section class="panel"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><b class="num" style="font-size:18px">${l.code}</b>
+      <div class="note">실사 ${esc(s.user)} · ${s.t}</div></div><span class="tg ${k==='ok'?'ok':k==='done'?'manual':k==='rej'?'diff':'hold'}">${RVL[k]}</span></div>
+     <div class="result diff"><span class="strike">${esc(l.item)} ${Q(l.qty)} ${fmtExp(l.exp)}</span> → <b style="display:inline">${f.empty?'비어 있음':`${esc(f.item)} ${Q(f.qty)} ${fmtExp(f.exp)}`}</b><div style="font-weight:700;margin-top:4px">${diffTxt(l,f)}</div></div>
+     ${r.reason?`<dl class="dl"><dt>소명 구분</dt><dd>${esc(r.cat)}</dd><dt>소명 내용</dt><dd>${esc(r.reason)}</dd><dt>소명자</dt><dd>${esc(r.by)} · ${r.t}</dd>${r.cBy?`<dt>${k==='rej'?'반려':'확인'}</dt><dd>${esc(r.cBy)} · ${r.cT}${r.memo?'<br>'+esc(r.memo):''}</dd>`:''}</dl>`:'<p class="note">아직 로지온코리아 소명이 없습니다.</p>'}
+     ${canW?`<div class="g2" style="margin-top:8px"><select class="in" id="rc${i}">${CATS.map(c=>`<option ${c===r.cat?'selected':''}>${c}</option>`).join('')}</select><span></span></div>
+       <textarea class="in" id="rt${i}" placeholder="수량 차이 사유를 구체적으로 기재" style="margin-top:8px">${esc(k==='done'?r.reason:'')}</textarea>
+       <button class="btn p" data-w="${i}" style="width:100%;margin-top:8px">${k==='done'?'소명 수정':'소명 등록'}</button>`:''}
+     ${canC?`<input class="in" id="rm${i}" placeholder="확인 메모 또는 반려 사유" style="margin-top:8px"><div class="g2" style="margin-top:8px"><button class="btn ok" data-c="${i}">사유 확인완료</button><button class="btn bad" data-j="${i}">반려 (재소명 요청)</button></div>`:''}
+     ${!canW&&!canC&&k!=='ok'?`<p class="note">${LG?'그레인온 확인을 기다리는 중입니다.':'로지온코리아 소명을 기다리는 중입니다.'}</p>`:''}
+    </section>`}).join(''):'<section class="panel"><p class="note">해당하는 건이 없습니다.</p></section>'}`;
+  document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{rvF=b.dataset.r;rev()});
+  const save=(l,rv,act,after,reason)=>{S[l.code].rv=rv;commit({t:now(),user:`${user}(${ORG})`,wh:WHN(),act,loc:l.code,before:diffTxt(l,S[l.code].fix),after,reason:reason||''},l.code);toast(`${l.code} ${act}`);rev()};
+  document.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{const i=+b.dataset.w,l=sh[i],t=$('rt'+i).value.trim(),c=$('rc'+i).value;
+    if(!t){toast('사유를 기재하세요');return}save(l,{st:'done',cat:c,reason:t,by:`${user}(${ORG})`,t:now()},'소명 등록',c,t)});
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const i=+b.dataset.c,l=sh[i],r=S[l.code].rv,m=$('rm'+i).value.trim();
+    save(l,Object.assign({},r,{st:'ok',cBy:`${user}(${ORG})`,cT:now(),memo:m}),'사유 확인완료',r.cat,m)});
+  document.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>{const i=+b.dataset.j,l=sh[i],r=S[l.code].rv,m=$('rm'+i).value.trim();
+    if(!m){toast('반려 사유를 기재하세요');return}save(l,Object.assign({},r,{st:'rej',cBy:`${user}(${ORG})`,cT:now(),memo:m}),'소명 반려',r.cat,m)});
 }
 
 /* ---- 작업기록 (구글시트 '작업로그'와 같은 형태) ---- */
