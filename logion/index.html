@@ -70,7 +70,8 @@ th{font-size:12px;color:var(--ink2);font-weight:600}th:first-child,td:first-chil
 .seg{display:inline-grid;grid-template-columns:1fr 1fr;background:var(--sf2);border:1px solid var(--line);border-radius:8px;padding:3px;margin-bottom:12px;width:100%;max-width:360px}
 .seg button{height:38px;border:0;background:none;border-radius:6px;font-weight:600;cursor:pointer;color:var(--ink2)}.seg button.on{background:var(--sf);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .cw{display:grid;grid-template-columns:330px 1fr;gap:12px;align-items:start}
-@media (max-width:820px){.cw{grid-template-columns:1fr}}
+@media (max-width:820px){.cw{grid-template-columns:1fr}#dt{order:-1}.route{max-height:45vh}}
+#dt{scroll-margin-top:120px}.route{position:relative}
 .route{max-height:62vh;overflow-y:auto}
 .ri{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;border-radius:6px;cursor:pointer;border:0;background:none;width:100%;text-align:left}
 .ri:hover{background:var(--sf2)}.ri.cur{background:color-mix(in srgb,var(--navy) 12%,var(--sf));outline:2px solid var(--navy)}
@@ -327,13 +328,14 @@ function count(){
   const drawRoute=()=>{let ls=list;
     if(mode==='loc'){const f=$('sf').value;ls=LOCS.filter(x=>x.zone===$('sz').value);if(f!=='all')ls=ls.filter(x=>status(x)===f)}
     $('rt').innerHTML=ls.length?ls.map(l=>{const s=status(l);return `<button class="ri ${l.code===cur?'cur':''}" data-c="${l.code}"><span><b class="num">${l.code}</b><small>${l.item?esc(l.item):'재고 없음'}</small></span><span class="tg ${s==='okE'?'ok':s}">${LABEL[s]}${s==='diff'?' · '+RVL[rvSt(S[l.code])]:''}</span></button>`}).join(''):'<p class="note">해당하는 로케이션이 없습니다.</p>';
-    $('rt').querySelectorAll('.ri').forEach(b=>b.onclick=()=>{cur=b.dataset.c;form='';count()});
-    const c=$('rt').querySelector('.ri.cur');if(c)c.scrollIntoView({block:'nearest'})};
+    $('rt').querySelectorAll('.ri').forEach(b=>b.onclick=()=>{cur=b.dataset.c;form='';count();toDt()});
+    const c=$('rt').querySelector('.ri.cur');if(c){const r=$('rt');r.scrollTop=c.offsetTop-r.clientHeight/2+c.offsetHeight/2}};
   if(mode==='loc'){['sz','sf'].forEach(id=>$(id).onchange=drawRoute);
     $('lq').onkeydown=e=>{if(e.key!=='Enter')return;const v=e.target.value.trim().toUpperCase();const l=BY[v]||LOCS.find(x=>x.code.includes(v));if(!l){toast('해당 로케이션이 없습니다');return}cur=l.code;form='';count()}}
   else $('iq').onchange=e=>{curItem=e.target.value;const f=routeList()[0];cur=f?f.code:null;form='';count()};
   drawRoute();detail(list);
 }
+function toDt(){if(innerWidth<=820)$('dt').scrollIntoView({block:'start'})}
 function detail(list){
   const d=$('dt');if(!cur||(mode==='item'&&!curItem)){d.innerHTML='<p class="note">왼쪽에서 로케이션을 선택하세요.</p>';return}
   const l=BY[cur],s=S[l.code],stt=status(l);
@@ -358,7 +360,7 @@ function detail(list){
      <textarea class="in" id="hm" placeholder="상세 사유 기재"></textarea><button class="btn p" id="hSave" style="width:100%;margin-top:8px">보류 저장</button></div>
    <div class="nav"><button class="btn" id="pv" ${i<=0?'disabled':''}>이전</button>${s?'<button class="btn sm" id="undo">처리 취소</button>':''}<button class="btn p" id="nx" ${i>=list.length-1?'disabled':''}>다음 로케이션</button></div>
    <p class="note">처리하면 다음 로케이션으로 자동 이동합니다 (존 안에서 1번 랙 1층 왼·오 → 2층 → … → 4층 → 다음 랙 순서).</p>`;
-  const next=()=>{const n=list[i+1];if(n){cur=n.code}form='';count()};
+  const next=()=>{const n=list[i+1];if(n){cur=n.code}form='';count();toDt()};
   const set=(st0,extra,act,after,reason)=>{S[l.code]=Object.assign({st:st0,user,t:now()},extra);record(l,act,after,reason);toast(`${l.code} ${act}`);next()};
   $('aOk').onclick=()=>set('ok',{},l.item?'확인완료':'빈칸 확인');
   $('aFix').onclick=()=>{form=form==='fix'?'':'fix';detail(list)};
@@ -370,7 +372,7 @@ function detail(list){
     set('hold',{reason:r,memo:m},'보류','',r+(m?' - '+m:''))};
   if($('undo'))$('undo').onclick=()=>{if(!confirm('처리 내용을 취소하고 미실사로 되돌릴까요? 기록은 그대로 남습니다.'))return;
     delete S[l.code];record(l,'처리 취소',`이전 처리: ${LABEL[stt]}`,'');toast('취소했습니다 (작업기록에 남음)');count()};
-  $('pv').onclick=()=>{cur=list[i-1].code;form='';count()};$('toMap').onclick=()=>{tab='map';render()};$('nx').onclick=next;
+  $('pv').onclick=()=>{cur=list[i-1].code;form='';count();toDt()};$('toMap').onclick=()=>{tab='map';render()};$('nx').onclick=next;
   if($('lot'))$('lot').onclick=()=>{$('lotB').innerHTML=`<b style="font-size:17px">LOT 정보</b><p class="note">지금은 소비기한만 있습니다. LOT 번호가 들어오면 아래 항목이 채워집니다.</p>
     <dl class="dl"><dt>LOT 번호</dt><dd>-</dd><dt>품목</dt><dd>${esc(l.item)}</dd><dt>제조일자</dt><dd>-</dd><dt>소비기한</dt><dd>${fmtExp(l.exp)}</dd><dt>입고일자</dt><dd>-</dd></dl><button class="btn" style="width:100%" onclick="$('lotM').classList.remove('show')">닫기</button>`;$('lotM').classList.add('show')};
 }
