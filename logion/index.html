@@ -110,12 +110,13 @@ const LIVE=!!SCRIPT_URL;let SRV=null;
 async function api(b){const r=await fetch(b.action==='commit'?SCRIPT_URL:SCRIPT_URL+'?'+new URLSearchParams(b),b.action==='commit'?{method:'POST',body:JSON.stringify(b)}:undefined);const j=await r.json();if(j.error)throw new Error(j.error);return j}
 function commit(e,loc,free){
   if(!LIVE){LOG.push(e);st.set('lg_log',LOG);st.set('lg_state_'+WID,S);return}
-  const q=st.get('lg_q',[]);q.push({action:'commit',wh:WHN(),entry:e,loc:loc||'',hasState:!!loc,state:loc?(S[loc]||null):null,free:free||null});st.set('lg_q',q);st.set('lg_state_'+WID,S);flush();
+  const q=st.get('lg_q',[]);q.push({action:'commit',wh:WHN(),entry:e,loc:loc||'',hasState:!!loc,state:loc?(S[loc]||null):null,free:free||null});st.set('lg_q',q);st.set('lg_state_'+WID,S);syncLabel();flush();
 }
 let flushing=false;
+function syncLabel(){const n=st.get('lg_q',[]).length,el=$('sy');if(el)el.textContent=n?` · 시트 전송 ${flushing?'중':'대기'} ${n}건`:' · 시트 저장 완료'}
 async function flush(){if(!LIVE||flushing)return;flushing=true;
-  while(true){const q=st.get('lg_q',[]);if(!q.length)break;try{await api(q[0]);const n=st.get('lg_q',[]);n.shift();st.set('lg_q',n)}catch(e){break}}
-  flushing=false;const left=st.get('lg_q',[]).length,el=$('sy');if(el)el.textContent=left?` · 시트 전송 대기 ${left}건`:'';}
+  while(true){syncLabel();const q=st.get('lg_q',[]);if(!q.length)break;try{await api(q[0]);const n=st.get('lg_q',[]);n.shift();st.set('lg_q',n)}catch(e){break}}
+  flushing=false;syncLabel();}
 function applySrv(r){S=r.state||{};for(const q of st.get('lg_q',[]))if(q.wh===WHN()&&q.hasState){if(q.state)S[q.loc]=q.state;else delete S[q.loc]}st.set('lg_state_'+WID,S);if(r.free)st.set('lg_free',r.free)}
 async function switchWH(){if(LIVE){$('app').innerHTML='<p class="note" style="padding:40px;text-align:center">시트에서 데이터를 불러오는 중…</p>';
   try{SRV=await api({action:'load',wh:WHN()})}catch(e){toast('시트 연결 실패: '+e.message);SRV={items:[],rows:[],state:{},free:[]}}}
