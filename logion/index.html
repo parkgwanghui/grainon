@@ -139,7 +139,7 @@ let WID=st.get('lg_wh','c1'),LOCS=[],BY={},ZONES=[],NODATA=false,FREE=false;
 const WHN=()=>WHS.find(w=>w.id===WID).name;
 function mkLoc(code,item,exp,qty){const m=code.match(/^([A-Z]\d\d)-(\d\d)-(\d\d)-(\d\d)$/);return {code,zone:code.slice(0,3),rack:m?+m[2]:0,level:m?+m[3]:0,bin:m?+m[4]:0,reg:!!m,item,exp,qty}}
 function loadWH(){
-  FREE=WID==='rt';LOCS=[];const SRC=LIVE?SRV:RAW;if(LIVE)ITEMS=SRV.items||[];
+  FREE=WID==='rt';LOCS=[];const SRC=LIVE?(SRV||{items:[],rows:[]}):RAW;if(LIVE)ITEMS=SRC.items||[];
   if(SRC.rows&&SRC.rows.length&&(WID==='c1'||LIVE))LOCS=SRC.rows.map(r=>mkLoc(r[0],r[1]?ITEMS[r[1]-1]:'',r[2]||'',r[3]===''?null:r[3]));
   if(WID==='c2'&&!LOCS.length){const add=(z,rk,lv)=>{for(let r=1;r<=rk;r++)for(let v=1;v<=lv;v++)for(let b=1;b<=2;b++)LOCS.push(mkLoc(`${z}-${pad(r)}-${pad(v)}-${pad(b)}`,'','',null))};
     add('C01',20,5);for(let i=2;i<=10;i++)add('C'+pad(i),10,5);for(let i=2;i<=15;i++)add('D'+pad(i),10,5)}
