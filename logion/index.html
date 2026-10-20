@@ -131,6 +131,10 @@ const st={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}
 const now=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`};
 const today=()=>now().slice(0,10);
 const Q=v=>v==null||v===''?'':Number(v).toLocaleString()+'개';
+function rvBox(s){const r=s.rv||{st:'wait'},k=r.st;
+  return `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><span class="tg ${k==='ok'?'ok':k==='done'?'manual':k==='rej'?'diff':'hold'}">차이 소명 · ${RVL[k]}</span>
+  ${r.reason?`<div style="margin-top:4px">${esc(r.cat)} · ${esc(r.reason)}<span class="note"> — ${esc(r.by)} ${r.t}</span></div>`:'<div class="note" style="margin-top:4px">로지온코리아 소명 전</div>'}
+  ${r.cBy?`<div>${k==='rej'?'반려':'확인'}: ${esc(r.cBy)} ${r.cT}${r.memo?' · '+esc(r.memo):''}</div>`:''}</div>`}
 function diffTxt(l,f){if(!f||!l.item)return '';if(f.empty)return l.qty?`수량 차이 -${Q(l.qty)}`:'';
   if(f.item!==l.item)return '품목 상이';const d=(+f.qty||0)-(+l.qty||0);return d?`수량 차이 ${d>0?'+':''}${Q(d)}`:'수량 동일'}
 const fmtExp=e=>/^\d{8}$/.test(e)?`${e.slice(0,4)}-${e.slice(4,6)}-${e.slice(6)}`:(e||'');
@@ -227,7 +231,7 @@ function query(){
    <div class="chips">${F.map(([k,v])=>`<button class="chip ${qF===k?'on':''}" data-q="${k}">${v}${k==='all'?'':' '+cnt(k)}</button>`).join('')}</div>
    <div class="g2" style="margin-bottom:10px"><select class="in" id="qz"><option value="">전체 존</option>${ZONES.map(z=>`<option ${z===qZ?'selected':''}>${z}</option>`).join('')}</select><input class="in" id="qt" placeholder="로케이션·품목·사유 검색" value="${esc(qT)}"></div>
    <div class="tscroll" style="max-height:60vh;overflow:auto"><table><tr><th>로케이션</th><th style="text-align:left">전산 품목</th><th>수량</th><th>소비기한</th><th style="text-align:left">상태</th><th style="text-align:left">실사 결과</th><th>수량 차이</th><th style="text-align:left">사유·메모</th><th>담당자</th><th>처리 일시</th></tr>
-   ${ls.slice(0,300).map(l=>{const s=S[l.code],k=status(l),f=s&&s.fix;return `<tr class="qr" data-c="${l.code}" style="cursor:pointer"><td class="num">${l.code}</td><td style="text-align:left">${esc(l.item)}</td><td class="num">${Q(l.qty)}</td><td class="num">${fmtExp(l.exp)}</td><td style="text-align:left"><span class="tg ${k==='okE'?'ok':k}">${LABEL[k]}</span></td><td style="text-align:left">${f?(f.empty?'비어 있음':`${esc(f.item)} / ${Q(f.qty)} / ${fmtExp(f.exp)}`):''}</td><td class="num" style="color:var(--bad)">${f?esc(diffTxt(l,f).replace('수량 차이 ','')):''}</td><td style="text-align:left">${esc([s&&s.reason,s&&s.memo].filter(Boolean).join(' - '))}</td><td>${s?esc(s.user):''}</td><td class="num">${s?s.t:''}</td></tr>`}).join('')}</table></div>
+   ${ls.slice(0,300).map(l=>{const s=S[l.code],k=status(l),f=s&&s.fix;return `<tr class="qr" data-c="${l.code}" style="cursor:pointer"><td class="num">${l.code}</td><td style="text-align:left">${esc(l.item)}</td><td class="num">${Q(l.qty)}</td><td class="num">${fmtExp(l.exp)}</td><td style="text-align:left"><span class="tg ${k==='okE'?'ok':k}">${LABEL[k]}${k==='diff'?' · '+RVL[rvSt(s)]:''}</span></td><td style="text-align:left">${f?(f.empty?'비어 있음':`${esc(f.item)} / ${Q(f.qty)} / ${fmtExp(f.exp)}`):''}</td><td class="num" style="color:var(--bad)">${f?esc(diffTxt(l,f).replace('수량 차이 ','')):''}</td><td style="text-align:left">${esc([s&&s.reason,s&&s.memo].filter(Boolean).join(' - '))}</td><td>${s?esc(s.user):''}</td><td class="num">${s?s.t:''}</td></tr>`}).join('')}</table></div>
    ${ls.length>300?'<p class="note">앞의 300건만 표시합니다. 존이나 검색어로 좁혀 보세요.</p>':''}${ls.length?'':'<p class="note">조건에 맞는 로케이션이 없습니다.</p>'}`;
   $('qs').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{qF=b.dataset.q;query()});
   $('qz').onchange=e=>{qZ=e.target.value;query()};
@@ -322,7 +326,7 @@ function count(){
   document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;form='';if(mode==='item'&&cur&&BY[cur].item&&!curItem)curItem=BY[cur].item;count()});
   const drawRoute=()=>{let ls=list;
     if(mode==='loc'){const f=$('sf').value;ls=LOCS.filter(x=>x.zone===$('sz').value);if(f!=='all')ls=ls.filter(x=>status(x)===f)}
-    $('rt').innerHTML=ls.length?ls.map(l=>{const s=status(l);return `<button class="ri ${l.code===cur?'cur':''}" data-c="${l.code}"><span><b class="num">${l.code}</b><small>${l.item?esc(l.item):'재고 없음'}</small></span><span class="tg ${s==='okE'?'ok':s}">${LABEL[s]}</span></button>`}).join(''):'<p class="note">해당하는 로케이션이 없습니다.</p>';
+    $('rt').innerHTML=ls.length?ls.map(l=>{const s=status(l);return `<button class="ri ${l.code===cur?'cur':''}" data-c="${l.code}"><span><b class="num">${l.code}</b><small>${l.item?esc(l.item):'재고 없음'}</small></span><span class="tg ${s==='okE'?'ok':s}">${LABEL[s]}${s==='diff'?' · '+RVL[rvSt(S[l.code])]:''}</span></button>`}).join(''):'<p class="note">해당하는 로케이션이 없습니다.</p>';
     $('rt').querySelectorAll('.ri').forEach(b=>b.onclick=()=>{cur=b.dataset.c;form='';count()});
     const c=$('rt').querySelector('.ri.cur');if(c)c.scrollIntoView({block:'nearest'})};
   if(mode==='loc'){['sz','sf'].forEach(id=>$(id).onchange=drawRoute);
@@ -336,7 +340,7 @@ function detail(list){
   const pos=l.reg?`${l.zone} 존 · ${l.rack}번 랙 · ${l.level}층 · ${l.bin===1?'왼쪽':'오른쪽'}`:`${l.zone} 존 · 통로바닥/선반 등`;
   let res='';
   if(s){const f=s.fix;res=`<div class="result ${s.st==='ok'?'ok':s.st}"><b>${LABEL[stt]} · ${esc(s.user)} · ${s.t}</b>
-    ${s.st==='diff'?`<span class="strike">${esc(l.item||'비어 있음')} ${Q(l.qty)} ${fmtExp(l.exp)}</span> → `:''}${f?`<b style="display:inline">${f.empty?'비어 있음':`${esc(f.item)} ${Q(f.qty)} ${fmtExp(f.exp)}`}</b>`:''}${f&&diffTxt(l,f)?`<div style="margin-top:4px;font-weight:700">${diffTxt(l,f)}</div>`:''}
+    ${s.st==='diff'?`<span class="strike">${esc(l.item||'비어 있음')} ${Q(l.qty)} ${fmtExp(l.exp)}</span> → `:''}${f?`<b style="display:inline">${f.empty?'비어 있음':`${esc(f.item)} ${Q(f.qty)} ${fmtExp(f.exp)}`}</b>`:''}${f&&diffTxt(l,f)?`<div style="margin-top:4px;font-weight:700">${diffTxt(l,f)}</div>`:''}${s.st==='diff'?rvBox(s):''}
     ${s.reason?`<div>사유: ${esc(s.reason)}</div>`:''}${s.memo?`<div>메모: ${esc(s.memo)}</div>`:''}</div>`}
   const i=list.findIndex(x=>x.code===cur);
   d.innerHTML=`<div class="code num">${l.code}</div><div class="note">${pos}</div><button class="btn sm" id="toMap" style="margin-top:6px">배치도에서 위치 보기</button>${res}
