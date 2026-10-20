@@ -113,9 +113,9 @@ function commit(e,loc,free){
   const q=st.get('lg_q',[]);q.push({action:'commit',wh:WHN(),entry:e,loc:loc||'',hasState:!!loc,state:loc?(S[loc]||null):null,free:free||null});st.set('lg_q',q);st.set('lg_state_'+WID,S);flush();
 }
 let flushing=false;
-async function flush(){if(!LIVE||flushing)return;flushing=true;let q=st.get('lg_q',[]);
-  while(q.length){try{await api(q[0]);q.shift();st.set('lg_q',q)}catch(e){break}}
-  flushing=false;const el=$('sy');if(el)el.textContent=q.length?` · 시트 전송 대기 ${q.length}건`:'';}
+async function flush(){if(!LIVE||flushing)return;flushing=true;
+  while(true){const q=st.get('lg_q',[]);if(!q.length)break;try{await api(q[0]);const n=st.get('lg_q',[]);n.shift();st.set('lg_q',n)}catch(e){break}}
+  flushing=false;const left=st.get('lg_q',[]).length,el=$('sy');if(el)el.textContent=left?` · 시트 전송 대기 ${left}건`:'';}
 function applySrv(r){S=r.state||{};for(const q of st.get('lg_q',[]))if(q.wh===WHN()&&q.hasState){if(q.state)S[q.loc]=q.state;else delete S[q.loc]}st.set('lg_state_'+WID,S);if(r.free)st.set('lg_free',r.free)}
 async function switchWH(){if(LIVE){$('app').innerHTML='<p class="note" style="padding:40px;text-align:center">시트에서 데이터를 불러오는 중…</p>';
   try{SRV=await api({action:'load',wh:WHN()})}catch(e){toast('시트 연결 실패: '+e.message);SRV={items:[],rows:[],state:{},free:[]}}}
