@@ -192,7 +192,7 @@ function render(){
   $('out').onclick=()=>{user=null;st.set('lg_user',null);login()};
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
   $('whs').onchange=e=>{WID=e.target.value;st.set('lg_wh',WID);switchWH().then(render)};
-  if(!FREE&&!LOCS.length&&tab!=='log'){$('pg').innerHTML='<section class="panel"><p class="note">로케이션재고 시트에 이 창고 데이터가 없습니다.</p></section>';return}
+  if(!FREE&&!LOCS.length&&tab!=='log'){$('pg').innerHTML=`<section class="panel">${tab==='map'?`<div class="mtools">${whSel()}</div>`:''}<p class="note">${WHN()}: 로케이션재고 시트에 이 창고 데이터가 없습니다.</p></section>`;bindWh();return}
   if(FREE)({dash:freeDash,map:freeMap,count:freeCount,log,rev:freeDash})[tab]();else ({dash,map,count,log,rev})[tab]();
 }
 
@@ -271,6 +271,8 @@ function freeDash(){
    <section class="panel"><h2>담당자별 기록 건수</h2>${Object.keys(us).length?`<table>${Object.entries(us).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v}건</td></tr>`).join('')}</table>`:'<p class="note">아직 기록이 없습니다.</p>'}</section>`;
 }
 
+const whSel=()=>`<select class="in" id="mw" style="max-width:150px;font-weight:600" aria-label="창고">${WHS.map(w=>`<option value="${w.id}" ${w.id===WID?'selected':''}>${w.name}</option>`).join('')}</select>`;
+function bindWh(){const m=$('mw');if(m)m.onchange=e=>{WID=e.target.value;st.set('lg_wh',WID);switchWH().then(render)}}
 /* ---- 배치도 ---- */
 function map(){
   if(!cur)cur=(LOCS.find(l=>status(l)==='todo')||LOCS[0]).code;
@@ -291,14 +293,14 @@ function map(){
     html+='</div>';
   }
   $('pg').innerHTML=`<section class="panel">
-    <div class="mtools"><input class="in" id="jump" placeholder="로케이션 이동 예) A05-09-02-01"><button class="btn" id="jb">이동</button>
+    <div class="mtools">${whSel()}<input class="in" id="jump" placeholder="로케이션 이동 예) A05-09-02-01"><button class="btn" id="jb">이동</button>
     ${cur?`<button class="btn p" id="hb">현재 위치 ${cur}</button>`:''}<button class="btn" id="zm">${zoom?'작게 보기':'크게 보기'}</button>
     <select class="in" id="zj" style="max-width:120px"><option value="">존 이동</option>${zonesTop.map(z=>`<option>${z}</option>`).join('')}</select></div>
     <div class="lg" style="margin:0 0 10px"><em style="--c:var(--todo)">미실사</em><em style="--c:var(--ok)">확인완료</em><em style="--c:var(--bad)">상이</em><em style="--c:var(--hold)">보류</em><em style="--c:var(--man)">수기 등록</em><em style="--c:var(--empty)">${NODATA?'미확인':'재고 없음'}</em><em style="--c:var(--emptyok)">빈칸 확인</em><em style="--c:var(--ink)">현재 위치(검은 테두리·흰 점)</em></div>
     <div class="mapbox ${zoom?'zoom':''}" id="mb">${html}</div>
     <p class="note">위아래·좌우로 스크롤할 수 있습니다. 칸을 누르면 그 로케이션 실사 화면으로 이동합니다. 각 랙은 왼쪽·오른쪽 2칸, 아래가 1층입니다.</p></section>`;
   document.querySelectorAll('#mb .c').forEach(b=>b.onclick=()=>{cur=b.dataset.c;mode='loc';tab='count';form='';render()});
-  $('zm').onclick=()=>{zoom=!zoom;map()};
+  $('zm').onclick=()=>{zoom=!zoom;map()};bindWh();
   const here=()=>{const h=document.querySelector('#mb .c.here');if(h)h.scrollIntoView({block:'center',inline:'center',behavior:'smooth'})};if($('hb'))$('hb').onclick=here;here();
   const jump=()=>{const v=$('jump').value.trim().toUpperCase();const l=BY[v]||LOCS.find(x=>x.code.includes(v));if(!v)return;if(!l){toast('해당 로케이션이 없습니다');return}
     const el=document.querySelector(`#mb .c[data-c="${CSS.escape(l.code)}"]`);document.querySelectorAll('.c.hit').forEach(x=>x.classList.remove('hit'));el.classList.add('hit');el.scrollIntoView({block:'center',inline:'center',behavior:'smooth'})};
@@ -358,8 +360,7 @@ function detail(list){
    <div class="form ${form==='hold'?'on':''}" id="fHold"><b>보류 사유</b>
      <select class="in" id="hr" style="margin:8px 0"><option>상단 적재로 확인 불가</option><option>박스 훼손·라벨 확인 불가</option><option>혼적으로 수량 확인 어려움</option><option>작업 중(입출고) 위치</option><option>기타</option></select>
      <textarea class="in" id="hm" placeholder="상세 사유 기재"></textarea><button class="btn p" id="hSave" style="width:100%;margin-top:8px">보류 저장</button></div>
-   <div class="nav"><button class="btn" id="pv" ${i<=0?'disabled':''}>이전</button>${s?'<button class="btn sm" id="undo">처리 취소</button>':''}<button class="btn p" id="nx" ${i>=list.length-1?'disabled':''}>다음 로케이션</button></div>
-   <p class="note">처리하면 다음 로케이션으로 자동 이동합니다 (존 안에서 1번 랙 1층 왼·오 → 2층 → … → 4층 → 다음 랙 순서).</p>`;
+   <div class="nav"><button class="btn" id="pv" ${i<=0?'disabled':''}>이전</button>${s?'<button class="btn sm" id="undo">처리 취소</button>':''}<button class="btn p" id="nx" ${i>=list.length-1?'disabled':''}>다음 로케이션</button></div>`;
   const next=()=>{const n=list[i+1];if(n){cur=n.code}form='';count();toDt()};
   const set=(st0,extra,act,after,reason)=>{S[l.code]=Object.assign({st:st0,user,t:now()},extra);record(l,act,after,reason);toast(`${l.code} ${act}`);next()};
   $('aOk').onclick=()=>set('ok',{},l.item?'확인완료':'빈칸 확인');
