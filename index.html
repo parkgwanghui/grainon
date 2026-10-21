@@ -205,6 +205,7 @@
     <div id="editBanner"></div>
     <div class="box" id="cartBox"></div>
     <div class="amt" id="amtBox"></div>
+    <button type="button" class="btn line full xl" data-act="excel" style="margin:-6px 0 16px">📥 엑셀로 받기</button>
     <div class="two">
       <div class="field"><label for="user">담당자<span class="req">*</span></label><input id="user" autocomplete="name"></div>
       <div class="field"><label for="dept">부서<span class="req">*</span></label><input id="dept"></div>
@@ -226,6 +227,7 @@
         <button class="btn line" data-act="editLast">수정</button>
         <button class="btn danger" data-act="cancelLast">등록 취소</button>
       </div>
+      <button class="btn line full" data-act="excelLast">📥 이 내역 엑셀로 받기</button>
       <button class="btn full" data-act="again">새로 담기</button>
       <div class="hint" id="doneHint"></div>
     </div>
@@ -417,6 +419,63 @@
     });
     return { amt: amt, noPrice: noPrice };
   }
+  /* ---------- 엑셀 받기 ---------- */
+  function loadXlsx() {
+    if (window.XLSX) return Promise.resolve();
+    return new Promise(function (ok, fail) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = ok; s.onerror = fail; document.head.appendChild(s);
+    });
+  }
+  function currentInfo() {
+    return { type: mode, place: place, user: $('#user').value.trim(), dept: $('#dept').value.trim(), purpose: purpose,
+             client: $('#client').value.trim(), memo: $('#memo').value.trim(), at: Date.now(),
+             items: Object.keys(cart).map(function (id) { return { id: id, qty: cart[id] }; }) };
+  }
+  function exportExcel(src, btn) {
+    if (!src.items || !src.items.length) { toast('담긴 샘플이 없어요.'); return; }
+    var label = btn.textContent; btn.disabled = true; btn.textContent = '파일 만드는 중…';
+    loadXlsx().then(function () {
+      var d = new Date(src.at || Date.now());
+      var ymd = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      var rows = src.items.map(function (x) {
+        var it = byId(x.id) || { name: x.name || x.id, unit: x.unit || '', price: '' };
+        var pr = it.price === '' || it.price == null ? '' : it.price;
+        return { name: it.name, id: x.id, qty: x.qty, unit: it.unit, price: pr, amt: pr === '' ? '' : pr * x.qty };
+      });
+      // 금액 높은 순 (금액 없는 품목은 맨 아래)
+      rows.sort(function (a, b) { return (b.amt === '' ? -1 : b.amt) - (a.amt === '' ? -1 : a.amt); });
+      var totQty = 0, totAmt = 0;
+      rows.forEach(function (r) { totQty += r.qty; if (r.amt !== '') totAmt += r.amt; });
+      var aoa = [
+        ['샘플 ' + (src.type === 'in' ? '입고' : '신청') + ' 내역'], [],
+        ['일시', ymd + ' ' + hhmm(d)],
+        ['요청번호', src.reqNo || '(등록 전)'],
+        ['장소', src.place || ''], ['담당자', src.user || ''], ['부서', src.dept || ''],
+        [src.type === 'in' ? '입고 구분' : '사용 구분', src.purpose || ''],
+        [src.type === 'in' ? '입고처' : '제공처', src.client || ''], ['비고', src.memo || ''], [],
+        ['No', '제품명', '샘플ID', '수량', '단위', '샘플 기준금액', '금액']
+      ];
+      var head = aoa.length;
+      rows.forEach(function (r, i) { aoa.push([i + 1, r.name, r.id, r.qty, r.unit, r.price, r.amt]); });
+      aoa.push(['합계', '', '', totQty, '', '', totAmt]);
+      aoa.push([]); aoa.push(['※ 샘플 기준금액입니다']);
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 12 }, { wch: 7 }, { wch: 6 }, { wch: 14 }, { wch: 14 }];
+      for (var r = head; r <= head + rows.length; r++) {
+        ['D', 'F', 'G'].forEach(function (col) { var c = ws[col + (r + 1)]; if (c && typeof c.v === 'number') c.z = '#,##0'; });
+      }
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '샘플내역');
+      var fname = '샘플' + (src.type === 'in' ? '입고' : '신청') + '_' + ymd.replace(/-/g, '') + '_' + hhmm(d).replace(':', '') + '.xlsx';
+      XLSX.writeFile(wb, fname);
+      toast('엑셀 파일을 받았어요.');
+    }).catch(function () {
+      toast('엑셀 파일을 만들지 못했어요. 인터넷 연결을 확인해 주세요.');
+    }).then(function () { btn.disabled = false; btn.textContent = label; });
+  }
+
   function clearCart() {
     var n = Object.keys(cart).length; if (!n) return false;
     if (!confirm('담은 ' + n + '개 품목의 수량을 모두 비울까요?')) return false;
@@ -570,6 +629,8 @@
     else if (d.edit) startEdit(findRecent(d.edit));
     else if (d.cancel) doCancel(findRecent(d.cancel));
     else if (d.act === 'close') closeSheet();
+    else if (d.act === 'excel') exportExcel(currentInfo(), t);
+    else if (d.act === 'excelLast') { if (lastDone) exportExcel(lastDone, t); }
     else if (d.act === 'clearAll') { if (clearCart()) closeSheet(); }
     else if (d.act === 'stopEdit') stopEdit();
     else if (d.act === 'again') { closeSheet(); window.scrollTo(0, 0); }
